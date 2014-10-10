@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Flamebot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="styles/jquery.mobile-1.4.4.css"/>
+    <link rel="stylesheet" href="styles/app.css"/>
+    <script src="js/jquery-1.11.1.min.js"></script>
+    <script src="js/jquery.mobile-1.4.4.js"></script>
+    <script src="js/app.js"></script>
+</head>
+<body>
+
+
+<div data-role="page" id="home">
+
+    <div data-role="header" data-position="fixed">
+        <a href="#popupAbout" data-rel="dialog" data-role="button" data-inline="true">About</a>
+
+        <h1>Flamebot</h1>
+        <a href="#popupTeam" data-rel="dialog" data-role="button" data-inline="true">My Team</a>
+    </div>
+
+    <div data-role="content">
+        <h3>Team: Crushinator</h3>
+
+        <div class="content-primary">
+            <ul data-role="listview" data-inset="true">
+                <li><a href="#" data-role="button" id="go-button">go</a>
+                <li><a href="#" data-role="button" id="stop-button">stop</a>
+                <li><a href="#" data-role="button" id="escape-button">escape</a>
+                <li><a href="#design" data-transition="slide">Design the behavior</a></li>
+                <li><a href="#practice" data-transition="slide">Practice the behavior</a></li>
+                <li><a href="#account">Connect to the world</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div data-role="page" id="popupAbout" data-theme="a" class="ui-corner-all">
+
+    <div data-role="header" data-theme="d" data-position="fixed">
+        <h1>The Flamebot</h1>
+    </div>
+
+    <div>
+        <h3>A new robotics</h3>
+
+        <p>Flamebot... a hybrid of steam power and modern robotics... a robot you teach that exhibits a life of its
+            own.</p>
+
+        <h3>Privacy Policy</h3>
+
+        <p>
+
+            The application records data such as the location of your phone and the name of your team. In some network
+            activities this will be stored on a server and visible during activities to other players. You can prevent
+            this data from being shared with others if you do not engage in network-coordinated games and activities.
+            Historical activity data may be made available when network activities have finished. In this case, team
+            names will be visible but the location data will be sanitized to not reveal specific geographic locations.
+
+        </p>
+    </div>
+</div>
+
+<div data-role="page" id="popupTeam" data-theme="a" class="ui-corner-all">
+
+    <div data-role="header" data-theme="d" data-position="fixed">
+        <h1>Name the team!</h1>
+    </div>
+
+    <div style="padding:10px 20px;">
+        <h3>Enter your team name</h3>
+        <label for="un" class="ui-hidden-accessible">Team name:</label>
+        <input type="text" name="user" id="un" value="" placeholder="name" data-theme="a"/>
+
+        <label for="pw" class="ui-hidden-accessible">Optional PIN:</label>
+        <input type="password" name="pass" id="pw" value="" placeholder="optional PIN" data-theme="a"/>
+
+        <button type="submit" data-theme="b">Save</button>
+    </div>
+</div>
+
+<div data-role="page" id="design">
+
+    <div data-role="header" data-position="fixed">
+        <a href="#home" data-rel="back" data-icon="arrow-l">back</a>
+
+        <h1>Behavior: Operating</h1>
+        <a href="#editDesign" data-rel="dialog" data-role="button" data-inline="true">Rename</a>
+    </div>
+
+    <div data-role="content">
+        <b>Listeners</b>
+        <a href="#addListener" data-rel="dialog" data-role="button" data-icon="plus" data-iconpos="notext" data-theme="a"
+           data-inline="true">+listener</a>
+        <ul data-role="listview" data-inset="true" data-theme="d">
+            <li><a href="#s2">
+                <h3>If: Battery drops below 50</h3>
+
+                <p>Do: Disable camera, Send message return-home</p>
+
+                <p>Then start: Returning</p>
+            </a></li>
+            <li><a href="#s3">
+                <h3>If: Destination came within 5</h3>
+
+                <p>Do: pop location from stack</p>
+            </a></li>
+            <li><a href="#s4">
+                <h3>If: Last destination was used</h3>
+
+                <p>Then start: Returning</p>
+            </a></li>
+        </ul>
+
+        <b>More specific behaviors</b>
+        <a href="#addActivity" data-role="button" data-icon="plus" data-iconpos="notext" data-theme="a"
+           data-inline="true">My button</a>
+        <ul data-role="listview" data-inset="true" data-theme="d">
+            <li><a href="#">Searching</a></li>
+            <li><a href="#">Returning</a></li>
+            <li><a href="#">Calling for help</a></li>
+        </ul>
+    </div>
+</div>
+
+<div data-role="page" id="editDesign" data-theme="a" class="ui-corner-all">
+
+    <div data-role="header" data-theme="d" data-position="fixed">
+        <h1>State Name</h1>
+    </div>
+
+    <div style="padding:10px 20px;">
+        <h3>Rename this state</h3>
+        <label for="un" class="ui-hidden-accessible">Name:</label>
+        <input type="text" name="user" id="un" value="" placeholder="name" data-theme="a"/>
+
+        <button type="submit" data-theme="b">Save</button>
+    </div>
+</div>
+
+<div data-role="page" id="addListener" data-theme="a" class="ui-corner-all">
+
+    <div data-role="header" data-theme="d">
+        <h1>New Listener</h1>
+    </div>
+
+    <div style="padding:10px 20px;">
+        if, do, then
+
+        <button type="submit" data-theme="b">Save</button>
+    </div>
+</div>
+
+<div data-role="page" id="practice">
+
+    <div data-role="header" data-position="fixed">
+        <a href="#home" data-rel="back" data-icon="arrow-l">back</a>
+        <a href="#refresh" data-icon="back">refresh</a>
+
+        <h1>Practice</h1>
+    </div>
+
+    <div data-role="content">
+        <div data-role="fieldcontain">
+            <fieldset data-role="controlgroup" data-type="horizontal">
+                <legend>Team role:</legend>
+                <input type="radio" name="radio-view" id="radio-view-a" value="list" checked/>
+                <label for="radio-view-a">Robot</label>
+                <input type="radio" name="radio-view" id="radio-view-b" value="grid"/>
+                <label for="radio-view-b">Mission Control</label>
+            </fieldset>
+        </div>
+        Robot name: <a href="#popupRobotName" data-rel="dialog" data-role="button" data-inline="true">Robot 1</a>
+        <fieldset data-role="controlgroup" data-type="horizontal">
+            <legend>Control Car:</legend>
+            <input type="radio" name="radio-choice-b" id="radio-choice-a" value="off" disabled="disabled"/>
+            <label for="radio-choice-a">Wifi Racer 2</label>
+            <input type="radio" name="radio-choice-b" id="radio-choice-b" value="on" disabled="disabled"/>
+            <label for="radio-choice-b">iRacer 3</label>
+        </fieldset>
+        <fieldset data-role="controlgroup" data-type="horizontal">
+            <legend>Announce message:</legend>
+            <input type="radio" name="radio-choice-b" id="radio-choice-f" value="on" disabled="disabled"/>
+            <label for="radio-choice-f">Start</label>
+            <input type="radio" name="radio-choice-b" id="radio-choice-e" value="off" disabled="disabled"/>
+            <label for="radio-choice-e">Battery low</label>
+        </fieldset>
+    </div>
+</div>
+
+</body>
+</html>

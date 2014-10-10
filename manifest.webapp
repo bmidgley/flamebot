@@ -1,0 +1,35 @@
+{
+  "version": "0.3",
+  "name": "firebot",
+  "description": "firebot controller",
+  "launch_path": "/index.html",
+  "icons": {
+    "16": "/app-icons/icon-16.png",
+    "48": "/app-icons/icon-48.png",
+    "128": "/app-icons/icon-128.png"
+  },
+  "developer": {
+    "name": "Brad Midgley",
+    "url": "http://flamebot.com"
+  },
+  "default_locale": "en",
+  "permissions" : {
+    "geolocation": {
+      "description": "Required to have location-based goals"
+    },
+    "systemXHR" : {
+      "description": "Required to communicate with robot or car"
+    },
+    "camera" : {
+      "description": "Required to take pictures during missions"
+    },
+    "device-storage:pictures" : {
+      "access": "readwrite",
+      "description": "Required to store pictures taken during missions"
+    },
+    "tcp-socket" : {
+      "description": "Required to send commands to robot or car"
+    }
+  },
+  "type": "privileged"
+}
