@@ -177,7 +177,6 @@ RobotFindingState = (function(_super) {
       if (d < -this.compass_variance) {
         newState = this.right_turning;
       }
-      console.log("correction = " + d);
       if (currentState === newState) {
         return null;
       }
@@ -294,7 +293,6 @@ drive = function(code, speed) {
     type: 'GET',
     dataType: 'html',
     success: function(data) {
-      console.log(data);
       return announceBotEvent({
         battery: data
       });
@@ -358,16 +356,8 @@ $(function() {
     });
   });
   return interval_id = window.setInterval(function() {
-    announceBotEvent({
+    return announceBotEvent({
       timer: 1
-    });
-    return null;
-    return navigator.geolocation.getCurrentPosition(function(position) {
-      return announceBotEvent({
-        location: position
-      });
-    }, function(error) {
-      return console.log(error);
     });
   }, 1000);
 });

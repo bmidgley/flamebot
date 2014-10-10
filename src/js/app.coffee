@@ -21,7 +21,6 @@ class RobotState
     unless newState
       newState = @listener(currentState, event)
       if newState
-        #console.log "entering #{newState.name}"
         newState.entering(currentState)
     newState
 
@@ -108,8 +107,6 @@ class RobotFindingState extends RobotState
       if d < -@compass_variance
         newState = @right_turning
 
-      console.log "correction = #{d}"
-
       return null if currentState == newState
       return newState
     , ->
@@ -136,8 +133,6 @@ class RobotFindingState extends RobotState
   correction: ->
     # return signed degree measurement needed to course correct
     # return 0 if we don't know which way we need to turn
-    #console.log @compass_reading
-    #console.log @current_location
     return 0 unless @compass_reading
     return 0 unless @current_location
     bearing = @bearing @location, @current_location
@@ -159,7 +154,6 @@ class RobotFindingState extends RobotState
     lon2 = @toRadians(b.longitude)
     n = (Math.sin((lat2-lat1)/2)**2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2-lon1)/2) * Math.sin((lon2-lon1)/2)
     d = 2 * r * Math.atan2(Math.sqrt(n), Math.sqrt(1-n))
-    #console.log [d,a,lat1,lon1,b,lat2,lon2]
     return d
 
 # build my state machine
@@ -185,7 +179,6 @@ $.ajaxSetup xhr: ->
 
 drive = (code, speed=8) ->
   $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) ->
-    console.log data
     announceBotEvent battery: data
 
 $ ->
@@ -214,7 +207,6 @@ $ ->
 
   window.addEventListener 'deviceorientation', (event) ->
     e = event
-    #console.log "#{e.alpha} #{e.beta} #{e.gamma}"
     # event.{alpha,beta,gamma} where alpha is compass direction
     announceBotEvent({orientation: event})
   , true
@@ -225,11 +217,6 @@ $ ->
 
   interval_id = window.setInterval ->
     announceBotEvent({timer: 1})
-    return null
-    navigator.geolocation.getCurrentPosition (position) ->
-      announceBotEvent location: position
-    , (error) ->
-      console.log error
   , 1000
 
 console.log finderBotState.name
