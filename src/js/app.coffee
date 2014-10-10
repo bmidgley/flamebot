@@ -183,13 +183,13 @@ drive = (code, speed=8) ->
 
 $ ->
   $("#go-button").click ->
-    announceBotEvent({button: "go"})
+    announceBotEvent button: "go"
 
   $("#stop-button").click ->
-    announceBotEvent({button: "stop"})
+    announceBotEvent button: "stop"
 
   $("#escape-button").click ->
-    announceBotEvent({button: "home"})
+    announceBotEvent button: "home"
 
   motionTimeStamp = 0
   motionVector = {x:0, y:0, z:0}
@@ -202,13 +202,13 @@ $ ->
     motionVector = {x:a.x, y:a.y, z:a.z}
     if v > 25 && interval > minInterval
       console.log "motion event magnitude #{v} after #{interval/minInterval} intervals"
-      announceBotEvent({crash: event})
+      announceBotEvent crash: event
       motionTimeStamp = event.timeStamp
 
   window.addEventListener 'deviceorientation', (event) ->
     e = event
     # event.{alpha,beta,gamma} where alpha is compass direction
-    announceBotEvent({orientation: event})
+    announceBotEvent orientation: event
   , true
 
   watch_id = navigator.geolocation.watchPosition (position) ->
@@ -216,7 +216,7 @@ $ ->
     announceBotEvent location: position
 
   interval_id = window.setInterval ->
-    announceBotEvent({timer: 1})
+    announceBotEvent timer: 1
   , 1000
 
 console.log finderBotState.name

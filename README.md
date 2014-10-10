@@ -5,3 +5,6 @@ state machine to drive a robot.
 
 It should soon be ready for a refactor as we're still experimenting to see what patterns 
 work when writing for it.
+
+BSD license
+Copyright 2014 Brad Midgley
