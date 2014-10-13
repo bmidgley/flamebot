@@ -2,25 +2,24 @@ class RobotState
   constructor: (@name, @goals, @listener, @entering) ->
     @behaviors = []
     @parent = null
+    @addForward = true
 
   # add a child state
   addChild: (state) ->
     state.parent = @
-    @behaviors.push state
+    if @addForward
+      @behaviors.push state
+    else
+      @behaviors.unshift state
     state
 
-  # insert a state and move my behaviors to its list
-  insertChild: (state) ->
-    state.behaviors = @behaviors
-    @behaviors = []
-    @addChild(state)
-
+  # process an event
   processEvent: (currentState, event) ->
     if @parent
       newState = @parent.processEvent(currentState, event)
     unless newState
       newState = @listener(currentState, event)
-      if newState
+      if newState && newState.entering
         newState.entering(currentState)
     newState
 
@@ -51,9 +50,7 @@ class RobotLoopState extends RobotState
     super name, goals, (currentState, event) ->
       # only modify the current state if it is me
       return null if currentState != @
-      return @behaviors[0] || @parent
-    , ->
-      null
+      @behaviors[0] || @parent
 
 # move to each child state in sequence then move to parent state
 class RobotSequentialState extends RobotState
@@ -66,6 +63,15 @@ class RobotSequentialState extends RobotState
       # sequence is initialized/incremented if reached from a descendant
       # and reset if we entered from elsewhere
       @counter = if @contains(oldState) then (@counter || -1) + 1 else 0
+
+# drop a flag at the current location as a finding state and child of x
+class RobotFlaggingState extends RobotState
+  constructor: (name, goals, parent) ->
+    super name, goals, (currentState, event) ->
+      if event.location
+        parent.addChild new RobotFindingState("flag: #{name}", [], event.location.coords)
+        return @parent
+      null
 
 # shoot a picture and move to parent state
 class RobotPhotographingState extends RobotState
@@ -156,23 +162,36 @@ class RobotFindingState extends RobotState
     d = 2 * r * Math.atan2(Math.sqrt(n), Math.sqrt(1-n))
     return d
 
-# build my state machine
-finderBot = new RobotState "waiting", ["stop"],
-(currentState, event) ->
-  if event.button
-    return currentState.findHandler(event.button)
-  null
-, ->
-  drive 0
-mission = finderBot.addChild new RobotSequentialState "stepping", ["go"]
-driving = mission.addChild new RobotFindingState "goal", ["goal"], {latitude: 40.0, longitude: -111.0}
-returning = mission.addChild new RobotFindingState "home", ["home"], {latitude: 41.0, longitude: -111.0}
+# limit time spent on an activity
+class RobotTimeLimit extends RobotState
+  constructor: (name, goals, @remaining) ->
+    super name, goals, (currentState, event) ->
+      if event.timer
+        @remaining -= event.timer
+        return @parent if @remaining <= 0
+      null
 
-finderBotState = finderBot
+# build my state machine
+class RobotTestMachine extends RobotState
+  constructor: ->
+    super "waiting", ["stop"], (currentState, event) ->
+      if event.button
+        return currentState.findHandler(event.button)
+      null
+    , ->
+      drive 0
+    @go = @addChild new RobotSequentialState "stepping", ["go"]
+    @store = @addChild new RobotFlaggingState "storing", ["store"], @go
+    @reset = @addChild RobotState "resetting", ["reset"], (currentState, event) ->
+      # start again with a clean slate
+      new RobotTestMachine()
+
+finderBotState = new RobotTestMachine()
 announceBotEvent = (event) ->
-  oldState = finderBotState
-  finderBotState = finderBotState.processEvent(finderBotState, event) || finderBotState
-  console.log finderBotState.name unless oldState == finderBotState
+  newState = finderBotState.processEvent(finderBotState, event)
+  if newState
+    finderBotState = newState
+    console.log finderBotState.name
 
 $.ajaxSetup xhr: ->
   new window.XMLHttpRequest mozSystem: true
@@ -182,19 +201,14 @@ drive = (code, speed=8) ->
     announceBotEvent battery: data
 
 $ ->
-  $("#go-button").click ->
-    announceBotEvent button: "go"
-
-  $("#stop-button").click ->
-    announceBotEvent button: "stop"
-
-  $("#escape-button").click ->
-    announceBotEvent button: "home"
+  for action in ["go", "stop", "store", "reset"]
+    $("##{action}-button").click ->
+      announceBotEvent button: action
 
   motionTimeStamp = 0
   motionVector = {x:0, y:0, z:0}
   minInterval = 1000000
-  window.addEventListener 'devicemotion', (event) ->
+  crash_id = window.addEventListener 'devicemotion', (event) ->
     a = event.accelerationIncludingGravity 
     m = motionVector
     v = (a.x - m.x)**2 + (a.y - m.y)**2 + (a.z - m.z)**2
@@ -205,7 +219,7 @@ $ ->
       announceBotEvent crash: event
       motionTimeStamp = event.timeStamp
 
-  window.addEventListener 'deviceorientation', (event) ->
+  orientation_id = window.addEventListener 'deviceorientation', (event) ->
     e = event
     # event.{alpha,beta,gamma} where alpha is compass direction
     announceBotEvent orientation: event
