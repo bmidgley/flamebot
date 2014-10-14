@@ -164,12 +164,23 @@ class RobotFindingState extends RobotState
 
 # limit time spent on an activity
 class RobotTimeLimit extends RobotState
-  constructor: (name, goals, @remaining) ->
+  constructor: (name, goals, @duration) ->
     super name, goals, (currentState, event) ->
       if event.timer
-        @remaining -= event.timer
-        return @parent if @remaining <= 0
+        @passed += event.timer
+        return @parent if @passed > @duration
+      if currentState == @
+        return @behaviors[0] || @parent
       null
+    , ->
+      @passed = 0
+
+# end an activity when battery drops too low
+class RobotBatteryLimit extends RobotState
+  constructor: (name, goals, @threshold) ->
+    super name, goals, (currentState, event) ->
+      return @parent if event.battery && event.battery < @threshold
+      return null
 
 # build my state machine
 class RobotTestMachine extends RobotState
@@ -180,9 +191,13 @@ class RobotTestMachine extends RobotState
       null
     , ->
       drive 0
-    @go = @addChild new RobotSequentialState "stepping", ["go"]
-    @store = @addChild new RobotFlaggingState "storing", ["store"], @go
-    @reset = @addChild RobotState "resetting", ["reset"], (currentState, event) ->
+
+    @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
+    @sequence = @limited.addChild new RobotSequentialState "stepping", ["stepping"]
+
+    @addChild new RobotFlaggingState "storing", ["store"], @sequence
+
+    @addChild RobotState "resetting", ["reset"], (currentState, event) ->
       # start again with a clean slate
       new RobotTestMachine()
 
