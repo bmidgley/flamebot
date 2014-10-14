@@ -186,14 +186,14 @@ class RobotBatteryLimit extends RobotState
 class RobotTestMachine extends RobotState
   constructor: ->
     super "waiting", ["stop"], (currentState, event) ->
-      if event.button
-        return currentState.findHandler(event.button)
-      null
+      return currentState.findHandler(event.button) if event.button
+      return null
     , ->
       drive 0
 
     @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["stepping"]
+    @sequence.addForward = false
 
     @addChild new RobotFlaggingState "storing", ["store"], @sequence
 

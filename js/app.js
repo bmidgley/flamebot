@@ -315,6 +315,7 @@ RobotTestMachine = (function(_super) {
     });
     this.limited = this.addChild(new RobotTimeLimit("limiting", ["go"], 180));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["stepping"]));
+    this.sequence.addForward = false;
     this.addChild(new RobotFlaggingState("storing", ["store"], this.sequence));
     this.addChild(RobotState("resetting", ["reset"], function(currentState, event) {
       return new RobotTestMachine();
