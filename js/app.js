@@ -119,13 +119,41 @@ RobotSequentialState = (function(_super) {
 
 })(RobotState);
 
+RobotTimeLimit = (function(_super) {
+  __extends(RobotTimeLimit, _super);
+
+  function RobotTimeLimit(name, goals, duration) {
+    this.duration = duration;
+    RobotTimeLimit.__super__.constructor.call(this, name, goals, function(currentState, event) {
+      this.passed = 0;
+      if (event.timer) {
+        this.passed += event.timer;
+        if (this.passed > this.duration) {
+          this.passed = 0;
+          return this.parent;
+        }
+      }
+      if (currentState === this) {
+        return this.parent;
+      }
+      return null;
+    }, function() {
+      return this.passed = 0;
+    });
+  }
+
+  return RobotTimeLimit;
+
+})(RobotState);
+
 RobotFlaggingState = (function(_super) {
   __extends(RobotFlaggingState, _super);
 
-  function RobotFlaggingState(name, goals, parent) {
+  function RobotFlaggingState(name, goals, target) {
+    this.target = target;
     RobotFlaggingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       if (event.location) {
-        parent.addChild(new RobotFindingState("flag: " + name, [], event.location.coords));
+        this.target.addChild(new RobotFindingState("flag: " + name, [], event.location.coords));
         return this.parent;
       }
       return null;
@@ -250,37 +278,12 @@ RobotFindingState = (function(_super) {
     lat2 = this.toRadians(b.latitude);
     lon1 = this.toRadians(a.longitude);
     lon2 = this.toRadians(b.longitude);
-    n = (Math.pow(Math.sin((lat2 - lat1) / 2), 2)) + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) * Math.sin((lon2 - lon1) / 2);
+    n = (Math.pow(Math.sin((lat2 - lat1) / 2), 2)) + Math.cos(lat1) * Math.cos(lat2) * (Math.pow(Math.sin((lon2 - lon1) / 2), 2));
     d = 2 * r * Math.atan2(Math.sqrt(n), Math.sqrt(1 - n));
     return d;
   };
 
   return RobotFindingState;
-
-})(RobotState);
-
-RobotTimeLimit = (function(_super) {
-  __extends(RobotTimeLimit, _super);
-
-  function RobotTimeLimit(name, goals, duration) {
-    this.duration = duration;
-    RobotTimeLimit.__super__.constructor.call(this, name, goals, function(currentState, event) {
-      if (event.timer) {
-        this.passed += event.timer;
-        if (this.passed > this.duration) {
-          return this.parent;
-        }
-      }
-      if (currentState === this) {
-        return this.behaviors[0] || this.parent;
-      }
-      return null;
-    }, function() {
-      return this.passed = 0;
-    });
-  }
-
-  return RobotTimeLimit;
 
 })(RobotState);
 

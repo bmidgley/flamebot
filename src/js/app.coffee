@@ -64,12 +64,28 @@ class RobotSequentialState extends RobotState
       # and reset if we entered from elsewhere
       @counter = if @contains(oldState) then (@counter || -1) + 1 else 0
 
+# limit time spent on an activity
+class RobotTimeLimit extends RobotState
+  constructor: (name, goals, @duration) ->
+    super name, goals, (currentState, event) ->
+      @passed = 0
+      if event.timer
+        @passed += event.timer
+        if @passed > @duration
+          @passed = 0
+          return @parent
+      if currentState == @
+        return @parent
+      null
+    , ->
+      @passed = 0
+
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (name, goals, parent) ->
+  constructor: (name, goals, @target) ->
     super name, goals, (currentState, event) ->
       if event.location
-        parent.addChild new RobotFindingState("flag: #{name}", [], event.location.coords)
+        @target.addChild new RobotFindingState("flag: #{name}", [], event.location.coords)
         return @parent
       null
 
@@ -158,22 +174,9 @@ class RobotFindingState extends RobotState
     lat2 = @toRadians(b.latitude)
     lon1 = @toRadians(a.longitude)
     lon2 = @toRadians(b.longitude)
-    n = (Math.sin((lat2-lat1)/2)**2) + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2-lon1)/2) * Math.sin((lon2-lon1)/2)
+    n = (Math.sin((lat2-lat1)/2)**2) + Math.cos(lat1) * Math.cos(lat2) * (Math.sin((lon2-lon1)/2)**2)
     d = 2 * r * Math.atan2(Math.sqrt(n), Math.sqrt(1-n))
     return d
-
-# limit time spent on an activity
-class RobotTimeLimit extends RobotState
-  constructor: (name, goals, @duration) ->
-    super name, goals, (currentState, event) ->
-      if event.timer
-        @passed += event.timer
-        return @parent if @passed > @duration
-      if currentState == @
-        return @behaviors[0] || @parent
-      null
-    , ->
-      @passed = 0
 
 # end an activity when battery drops too low
 class RobotBatteryLimit extends RobotState
