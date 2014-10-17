@@ -32,11 +32,20 @@ RobotState = (function() {
     }
     if (!newState) {
       newState = this.listener(currentState, event);
-      if (newState && newState.entering) {
-        newState.entering(currentState);
+      if (newState) {
+        newState.enterAll(currentState, newState);
       }
     }
     return newState;
+  };
+
+  RobotState.prototype.enterAll = function(oldState, currentState) {
+    if (this.parent) {
+      this.parent.enterAll(oldState, currentState);
+    }
+    if (this.entering) {
+      return this.entering(oldState, currentState);
+    }
   };
 
   RobotState.prototype.findHandler = function(goal) {
@@ -110,7 +119,10 @@ RobotSequentialState = (function(_super) {
         return null;
       }
       return this.behaviors[this.counter] || this.parent;
-    }, function(oldState) {
+    }, function(oldState, currentState) {
+      if (currentState !== this) {
+        return;
+      }
       return this.counter = this.contains(oldState) ? (this.counter || -1) + 1 : 0;
     });
   }
@@ -137,8 +149,10 @@ RobotTimeLimit = (function(_super) {
         return this.parent;
       }
       return null;
-    }, function() {
-      return this.passed = 0;
+    }, function(oldState, currentState) {
+      if (!this.contains(oldstate)) {
+        return this.passed = 0;
+      }
     });
   }
 
@@ -170,8 +184,11 @@ RobotPhotographingState = (function(_super) {
   function RobotPhotographingState(name, goals, filename) {
     RobotPhotographingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       return this.parent;
-    }, function() {
+    }, function(oldState, currentState) {
       var options;
+      if (currentState !== this) {
+        return;
+      }
       options = {
         camera: navigator.mozCameras.getListOfCameras()[0]
       };
@@ -223,17 +240,26 @@ RobotFindingState = (function(_super) {
         return null;
       }
       return newState;
-    }, function() {
+    }, function(oldState, currentState) {
+      if (currentState !== this) {
+        return;
+      }
       return drive(1);
     });
     this.left_turning = this.addChild(new RobotState("" + this.name + ": left-turn", ["left-turn"], function(currentState, event) {
       return null;
-    }, function() {
+    }, function(oldState, currentState) {
+      if (currentState !== this) {
+        return;
+      }
       return drive(5);
     }));
     this.right_turning = this.addChild(new RobotState("" + this.name + ": right-turn", ["right-turn"], function(currentState, event) {
       return null;
-    }, function() {
+    }, function(oldState, currentState) {
+      if (currentState !== this) {
+        return;
+      }
       return drive(6);
     }));
   }
@@ -313,7 +339,10 @@ RobotTestMachine = (function(_super) {
         return currentState.findHandler(event.button);
       }
       return null;
-    }, function() {
+    }, function(oldState, currentState) {
+      if (currentState !== this) {
+        return;
+      }
       return drive(0);
     });
     this.limited = this.addChild(new RobotTimeLimit("limiting", ["go"], 180));

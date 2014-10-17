@@ -19,9 +19,13 @@ class RobotState
       newState = @parent.processEvent(currentState, event)
     unless newState
       newState = @listener(currentState, event)
-      if newState && newState.entering
-        newState.entering(currentState)
+      if newState
+        newState.enterAll(currentState, newState)
     newState
+
+  enterAll: (oldState, currentState) ->
+    @parent.enterAll(oldState, currentState) if @parent
+    @entering(oldState, currentState) if @entering
 
   findHandler: (goal) ->
     @ancestor().findHandlerR(goal)
@@ -59,9 +63,10 @@ class RobotSequentialState extends RobotState
       # only modify the current state if it is me
       return null if currentState != @
       return @behaviors[@counter] || @parent
-    , (oldState) ->
+    , (oldState, currentState) ->
       # sequence is initialized/incremented if reached from a descendant
       # and reset if we entered from elsewhere
+      return unless currentState == @
       @counter = if @contains(oldState) then (@counter || -1) + 1 else 0
 
 # limit time spent on an activity
@@ -77,8 +82,10 @@ class RobotTimeLimit extends RobotState
       if currentState == @
         return @parent
       null
-    , ->
-      @passed = 0
+    , (oldState, currentState) ->
+      # if the state was an ancestor before, need to reset the timer
+      unless @contains oldstate
+        @passed = 0
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
@@ -94,7 +101,8 @@ class RobotPhotographingState extends RobotState
   constructor: (name, goals, filename) ->
     super name, goals, (currentState, event) ->
       @parent
-    , ->
+    , (oldState, currentState) ->
+      return unless currentState == @
       options = camera: navigator.mozCameras.getListOfCameras()[0]
       naigator.mozCameras.getCamera options, (camera) ->
         poptions =
@@ -131,19 +139,22 @@ class RobotFindingState extends RobotState
 
       return null if currentState == newState
       return newState
-    , ->
+    , (oldState, currentState) ->
+      return unless currentState == @
       drive 1
 
     @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"],
     (currentState, event) ->
       null
-    , ->
+    , (oldState, currentState) ->
+      return unless currentState == @
       drive 5
 
     @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"],    
     (currentState, event) ->
       null
-    , ->
+    , (oldState, currentState) ->
+      return unless currentState == @
       drive 6
 
   toRadians: (r) ->
@@ -191,7 +202,8 @@ class RobotTestMachine extends RobotState
     super "waiting", ["stop"], (currentState, event) ->
       return currentState.findHandler(event.button) if event.button
       return null
-    , ->
+    , (oldState, currentState) ->
+      return unless currentState == @
       drive 0
 
     @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
