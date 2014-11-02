@@ -84,7 +84,7 @@ class RobotTimeLimit extends RobotState
       null
     , (oldState, currentState) ->
       # if the state was an ancestor before, need to reset the timer
-      unless @contains oldstate
+      unless @contains oldState
         @passed = 0
 
 # drop a flag at the current location as a finding state and child of x
@@ -212,7 +212,7 @@ class RobotTestMachine extends RobotState
 
     @addChild new RobotFlaggingState "storing", ["store"], @sequence
 
-    @addChild RobotState "resetting", ["reset"], (currentState, event) ->
+    @addChild new RobotState "resetting", ["reset"], (currentState, event) ->
       # start again with a clean slate
       new RobotTestMachine()
 
@@ -230,10 +230,26 @@ drive = (code, speed=8) ->
   $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) ->
     announceBotEvent battery: data
 
+drive2command = (code) ->
+  newCode = "05893476"[code-1]
+  return "$#{newCode}9476$?" if newCode
+  return "$?"
+
+carSocket = null
+drive2 = (code) ->
+  unless carSocket
+    carSocket = navigator.mozTCPSocket.open("192.168.2.3", 9000)
+    carSocket.ondata = (event) ->
+      console.log "battery event: #{event.data}"
+      level = (parseInt(evant.data.slice(2), 16) - 0xb00 ) / 4
+      console.log level
+  carSocket.send drive2command code
+
 $ ->
   for action in ["go", "stop", "store", "reset"]
-    $("##{action}-button").click ->
-      announceBotEvent button: action
+    do (action) ->
+      $("##{action}-button").click ->
+        announceBotEvent button: action
 
   motionTimeStamp = 0
   motionVector = {x:0, y:0, z:0}
