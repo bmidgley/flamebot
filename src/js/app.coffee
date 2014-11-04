@@ -230,32 +230,6 @@ driveLittleCar = (code, speed=8) ->
   $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) ->
     announceBotEvent battery: data
 
-drive2command = (code) ->
-  newCode = "05893476"[code-1]
-  return "$#{newCode}9476$?" if newCode
-  return "$?"
-
-carSocket = null
-
-car2connect = ->
-  carSocket = navigator.mozTCPSocket.open("192.168.2.3", 9000)
-  carSocket.ondata = (event) ->
-    level = (parseInt(event.data.slice(2), 16) - 2655 ) * 0.21
-    # mask occasional bad readings
-    if level >= 0
-      announceBotEvent battery: level
-    console.log "battery at #{level}"
-  carSocket
-
-driveBigCar = (code) ->
-  command = drive2command code
-  if carSocket && carSocket.readyState == "open"
-    carSocket.send command
-  else
-    car2connect()
-    carSocket.onopen = ->
-      carSocket.send command
-
 class BigCar
   constructor: (@pace=250, @address="192.168.2.3", @port=9000) ->
     @connecting = false
