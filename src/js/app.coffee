@@ -226,7 +226,7 @@ announceBotEvent = (event) ->
 $.ajaxSetup xhr: ->
   new window.XMLHttpRequest mozSystem: true
 
-drive = (code, speed=8) ->
+driveLittleCar = (code, speed=8) ->
   $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) ->
     announceBotEvent battery: data
 
@@ -236,14 +236,61 @@ drive2command = (code) ->
   return "$?"
 
 carSocket = null
-drive2 = (code) ->
-  unless carSocket
-    carSocket = navigator.mozTCPSocket.open("192.168.2.3", 9000)
-    carSocket.ondata = (event) ->
-      console.log "battery event: #{event.data}"
-      level = (parseInt(evant.data.slice(2), 16) - 0xb00 ) / 4
-      console.log level
-  carSocket.send drive2command code
+
+car2connect = ->
+  carSocket = navigator.mozTCPSocket.open("192.168.2.3", 9000)
+  carSocket.ondata = (event) ->
+    level = (parseInt(event.data.slice(2), 16) - 2655 ) * 0.21
+    # mask occasional bad readings
+    if level >= 0
+      announceBotEvent battery: level
+    console.log "battery at #{level}"
+  carSocket
+
+driveBigCar = (code) ->
+  command = drive2command code
+  if carSocket && carSocket.readyState == "open"
+    carSocket.send command
+  else
+    car2connect()
+    carSocket.onopen = ->
+      carSocket.send command
+
+class BigCar
+  constructor: (@pace=250, @address="192.168.2.3", @port=9000) ->
+    @connecting = false
+    @connectSocket()
+    @commands = []
+    window.setInterval (=> @nextCode()), @pace
+
+  connectSocket: ->
+    return if @connecting
+    @connecting = true
+    @socket = navigator.mozTCPSocket.open(@address, @port)
+    @socket.onopen = =>
+      @connecting = false
+    @socket.ondata = (event) ->
+      level = (parseInt(event.data.slice(2), 16) - 2655 ) / 4
+      announceBotEvent battery: level
+      console.log "battery at #{level}"
+
+  drive: (code) ->
+    @commands.push code
+
+  code2command: (code) ->
+    newCode = "05893476"[code-1]
+    return "$#{newCode}9476$?" if newCode
+    return "$?"
+
+  nextCode: ->
+    if @socket.readyState == "open"
+      if @commands.length > 0
+        @socket.send @code2command @commands.shift()
+    else
+      @connectSocket()
+      
+car = new BigCar()
+drive = (code) -> car.drive(code)
 
 $ ->
   for action in ["go", "stop", "store", "reset"]
@@ -275,16 +322,17 @@ $ ->
     # position.coords.{latitude,longitude}
     announceBotEvent location: position
 
-  interval_id = window.setInterval ->
-    announceBotEvent timer: 1
-  , 1000
+  interval_id = window.setInterval (-> announceBotEvent timer: 1), 1000
 
 console.log finderBotState.name
 
 # adb shell
+
+# shell command required to drive little car
 # rfcomm bind hci0 00:12:05:09:97:47 1
 # echo $$ >/persist/drive.pid
 # while true; do
 #  request=`echo -e -n "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\n99" | nc -l -p 8080`
 #  echo -e -n "\x${request:5:2}"
 #done >/dev/rfcomm0
+
