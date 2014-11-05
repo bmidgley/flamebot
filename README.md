@@ -17,5 +17,12 @@ Add events:
 * accelerometer for rising, falling, terrain info
 * IR channel for special targets that are IR bright
 
+More refactoring:
+
+* simplify goals handling -- one item not array?
+* inject car driver into state machine
+* inject state machine into events
+* refactor events to be class-based
+
 BSD license
 Copyright 2014 Brad Midgley
