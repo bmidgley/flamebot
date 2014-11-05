@@ -89,10 +89,10 @@ class RobotTimeLimit extends RobotState
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (name, goals, @target) ->
+  constructor: (driver, name, goals, @target) ->
     super name, goals, (currentState, event) ->
       if event.location
-        @target.addChild new RobotFindingState("flag: #{name}", [], event.location.coords)
+        @target.addChild new RobotFindingState(driver, "flag: #{name}", [], event.location.coords)
         return @parent
       null
 
@@ -114,7 +114,7 @@ class RobotPhotographingState extends RobotState
 
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
-  constructor: (name, goals, @location, @perimeter=1, @compass_variance=20) ->
+  constructor: (@driver, name, goals, @location, @perimeter=1, @compass_variance=20) ->
     super name, goals, (currentState, event) ->
       # location
       if event.location
@@ -141,21 +141,21 @@ class RobotFindingState extends RobotState
       return newState
     , (oldState, currentState) ->
       return unless currentState == @
-      drive 1
+      @driver.drive 1
 
     @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"],
     (currentState, event) ->
       null
     , (oldState, currentState) ->
       return unless currentState == @
-      drive 5
+      @driver.drive 5
 
     @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"],    
     (currentState, event) ->
       null
     , (oldState, currentState) ->
       return unless currentState == @
-      drive 6
+      @driver.drive 6
 
   toRadians: (r) ->
     r * Math.PI / 180.0
@@ -196,32 +196,24 @@ class RobotBatteryLimit extends RobotState
       return @parent if event.battery && event.battery < @threshold
       return null
 
-# build my state machine
-class RobotTestMachine extends RobotState
+# keep track of state
+class StateTracker
   constructor: ->
-    super "waiting", ["stop"], (currentState, event) ->
-      return currentState.findHandler(event.button) if event.button
-      return null
-    , (oldState, currentState) ->
-      return unless currentState == @
-      drive 0
 
-    @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
-    @sequence = @limited.addChild new RobotSequentialState "stepping", ["stepping"]
-    @sequence.addForward = false
+  setState: (@state) ->
+    @state.enterAll(null, @state)
+    @showState()
 
-    @addChild new RobotFlaggingState "storing", ["store"], @sequence
+  announce: (event) ->
+    return unless @state
+    newState = @state.processEvent(@state, event)
+    if newState
+      @state = newState
+      @showState()
 
-    @addChild new RobotState "resetting", ["reset"], (currentState, event) ->
-      # start again with a clean slate
-      new RobotTestMachine()
+  showState: ->
+    console.log "entered state #{@state.name}"
 
-finderBotState = new RobotTestMachine()
-announceBotEvent = (event) ->
-  newState = finderBotState.processEvent(finderBotState, event)
-  if newState
-    finderBotState = newState
-    console.log finderBotState.name
 
 # LittleCar aka iRacer
 # LittleCar depends on a helper to bridge to bluetooth
@@ -233,18 +225,18 @@ announceBotEvent = (event) ->
 #done >/dev/rfcomm0
 
 class LittleCar
-  constructor: ->
+  constructor: (@bot) ->
     $.ajaxSetup xhr: -> new window.XMLHttpRequest mozSystem: true
 
   drive: (code, speed=8) ->
-    $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) ->
-      announceBotEvent battery: data
+    $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) =>
+      @bot.announce battery: data
 
 # BigCar aka Brookstone's Wifi Racer
-# BigCar depends on the user to connect the phone to the car's wifi access point first
+# BigCar depends on the user to connect the phone to the car's wifi access point
 
 class BigCar
-  constructor: (@pace=250, @address="192.168.2.3", @port=9000) ->
+  constructor: (@bot, @pace=250, @address="192.168.2.3", @port=9000) ->
     @connecting = false
     @connectSocket()
     @commands = []
@@ -257,10 +249,9 @@ class BigCar
     @socket.onopen = => @connecting = false
     @socket.onerror = => @connecting = false
     @socket.onclose = => @connecting = false
-    @socket.ondata = (event) ->
+    @socket.ondata = (event) =>
       level = (parseInt(event.data.slice(2), 16) - 2655 ) / 4
-      announceBotEvent battery: level
-      console.log "battery at #{level}"
+      @bot.announce battery: level
 
   drive: (code) -> @commands.push code
 
@@ -276,40 +267,85 @@ class BigCar
     else
       @connectSocket()
       
-littlecar = new LittleCar()
-bigcar = new BigCar()
+class Announcer
+  constructor: (@name, @bot) ->
+    console.log "tracking #{@name} events"
 
-drive = (code,speed) -> bigcar.drive(code,speed)
+class ButtonAnnouncer extends Announcer
+  constructor: (name, bot, buttons) ->
+    super name, bot
+    for action in buttons
+      do (action) ->
+        $("##{action}-button").click => @bot.announce button: action
+
+class CrashAnnouncer extends Announcer
+  constructor: (name, bot, @magnitude = 25, @mininterval = 1000000) ->
+    super name, bot
+    @motionTimeStamp = 0
+    @motionVector = {x:0, y:0, z:0}
+    @crash_id = window.addEventListener 'devicemotion', (event) =>
+      a = event.accelerationIncludingGravity
+      m = @motionVector
+      v = (a.x - m.x)**2 + (a.y - m.y)**2 + (a.z - m.z)**2
+      interval = event.timeStamp - @motionTimeStamp
+      @motionVector = {x:a.x, y:a.y, z:a.z}
+      if v > @magnitude && interval > @mininterval
+        console.log "motion event magnitude #{v} after #{interval/@mininterval} intervals"
+        @bot.announce crash: event
+        @motionTimeStamp = event.timeStamp
+
+# announce orentation event.{alpha,beta,gamma} where alpha is compass direction
+class OrientationAnnouncer extends Announcer
+  constructor: (name, bot) ->
+    super name, bot
+    @orientation_id = window.addEventListener 'deviceorientation', (event) =>
+      @bot.announce orientation: event
+    , true
+
+# announce location.coords.{latitude,longitude}
+class LocationAnnouncer extends Announcer
+  constructor: (name, bot) ->
+    super name, bot
+    @watch_id = navigator.geolocation.watchPosition (location) =>
+      @bot.announce location: location
+
+# announce time has passed
+class TimeAnnouncer extends Announcer
+  constructor: (name, bot) ->
+    super name, bot
+    @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
+
+
+# build my robot's state machine
+class RobotTestMachine extends RobotState
+  constructor: (@driver) ->
+    super "waiting", ["stop"], (currentState, event) ->
+      return currentState.findHandler(event.button) if event.button
+      console.log("battery is now #{event.battery}") if event.battery
+      return null
+    , (oldState, currentState) ->
+      return unless currentState == @
+      @driver.drive 0
+
+    @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
+    @sequence = @limited.addChild new RobotSequentialState "stepping", ["stepping"]
+    @sequence.addForward = false
+
+    @addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
+
+    @addChild new RobotState "resetting", ["reset"], (currentState, event) ->
+      # start again with a clean slate
+      new RobotTestMachine(@driver)
+
+# build my robot and wire up events
+
+bot = new StateTracker()
+bot.setState new RobotTestMachine(new BigCar(bot))
 
 $ ->
-  for action in ["go", "stop", "store", "reset"]
-    do (action) ->
-      $("##{action}-button").click -> announceBotEvent button: action
+  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset"]
+  new CrashAnnouncer "crash", bot
+  new OrientationAnnouncer "orientation", bot
+  new LocationAnnouncer "location", bot
+  new TimeAnnouncer "time", bot
 
-  motionTimeStamp = 0
-  motionVector = {x:0, y:0, z:0}
-  minInterval = 1000000
-  crash_id = window.addEventListener 'devicemotion', (event) ->
-    a = event.accelerationIncludingGravity 
-    m = motionVector
-    v = (a.x - m.x)**2 + (a.y - m.y)**2 + (a.z - m.z)**2
-    interval = event.timeStamp - motionTimeStamp
-    motionVector = {x:a.x, y:a.y, z:a.z}
-    if v > 25 && interval > minInterval
-      console.log "motion event magnitude #{v} after #{interval/minInterval} intervals"
-      announceBotEvent crash: event
-      motionTimeStamp = event.timeStamp
-
-  orientation_id = window.addEventListener 'deviceorientation', (event) ->
-    e = event
-    # event.{alpha,beta,gamma} where alpha is compass direction
-    announceBotEvent orientation: event
-  , true
-
-  watch_id = navigator.geolocation.watchPosition (position) ->
-    # position.coords.{latitude,longitude}
-    announceBotEvent location: position
-
-  interval_id = window.setInterval (-> announceBotEvent timer: 1), 1000
-
-console.log finderBotState.name
