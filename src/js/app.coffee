@@ -72,27 +72,30 @@ class RobotSequentialState extends RobotState
 # limit time spent on an activity
 class RobotTimeLimit extends RobotState
   constructor: (name, goals, @duration) ->
-    super name, goals, (currentState, event) ->
-      @passed = 0
+    super name, goals, (currentState, event) =>
+      @elapsed = 0
       if event.timer
-        @passed += event.timer
-        if @passed > @duration
-          @passed = 0
+        console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
+        @elapsed += event.timer
+        if @elapsed > @duration
+          @elapsed = 0
           return @parent
       if currentState == @
+        console.log "limit's child completed; passing back to parent"
         return @parent
       null
     , (oldState, currentState) ->
       # if the state was an ancestor before, need to reset the timer
       unless @contains oldState
-        @passed = 0
+        @elapsed = 0
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
   constructor: (driver, name, goals, @target) ->
     super name, goals, (currentState, event) ->
       if event.location
-        @target.addChild new RobotFindingState(driver, "flag: #{name}", [], event.location.coords)
+        finder = @target.addChild new RobotFindingState(driver, "flag: #{name}", [], event.location.coords)
+        console.log finder
         return @parent
       null
 
@@ -139,21 +142,21 @@ class RobotFindingState extends RobotState
 
       return null if currentState == newState
       return newState
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       return unless currentState == @
       @driver.drive 1
 
     @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"],
     (currentState, event) ->
       null
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       return unless currentState == @
       @driver.drive 5
 
     @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"],    
     (currentState, event) ->
       null
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       return unless currentState == @
       @driver.drive 6
 
@@ -194,6 +197,14 @@ class RobotBatteryLimit extends RobotState
   constructor: (name, goals, @threshold) ->
     super name, goals, (currentState, event) ->
       return @parent if event.battery && event.battery < @threshold
+      return null
+
+# base button handler and some debug
+class ButtonWatcher extends RobotState
+  constructor: (name, goals) ->
+    super name, goals, (currentState, event) ->
+      return currentState.findHandler(event.button) if event.button
+      console.log("battery is now #{event.battery}") if event.battery
       return null
 
 # keep track of state
@@ -308,8 +319,7 @@ class OrientationAnnouncer extends Announcer
 class LocationAnnouncer extends Announcer
   constructor: (name, bot) ->
     super name, bot
-    @watch_id = navigator.geolocation.watchPosition (location) =>
-      @bot.announce location: location
+    @watch_id = navigator.geolocation.watchPosition (location) => @bot.announce location: location, -> console.log "geolocation error", enableHighAccuracy: true
 
 # announce time has passed
 class TimeAnnouncer extends Announcer
@@ -317,25 +327,22 @@ class TimeAnnouncer extends Announcer
     super name, bot
     @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
 
-
 # build my robot's state machine
-class RobotTestMachine extends RobotState
+# todo: only stops when we construct this but not when we enter it
+# todo: low-grade location is accepted
+# todo: limit's elapsed is always 0
+class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
-    super "waiting", ["stop"], (currentState, event) ->
-      return currentState.findHandler(event.button) if event.button
-      console.log("battery is now #{event.battery}") if event.battery
-      return null
-    , (oldState, currentState) ->
-      return unless currentState == @
-      @driver.drive 0
+    super "waiting", ["stop"]
+    @driver.drive 0
 
-    @limited = @addChild new RobotTimeLimit "limiting", ["go"], 180
-    @sequence = @limited.addChild new RobotSequentialState "stepping", ["stepping"]
+    @limited = @addChild new RobotTimeLimit "limiting", [], 180
+    @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
     @sequence.addForward = false
 
-    @addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
+    @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
 
-    @addChild new RobotState "resetting", ["reset"], (currentState, event) ->
+    @addChild new RobotState "resetting", ["reset"], (currentState, event) =>
       # start again with a clean slate
       new RobotTestMachine(@driver)
 
