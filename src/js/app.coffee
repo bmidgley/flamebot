@@ -239,7 +239,7 @@ class BigCar
   constructor: (@bot, @pace=250, @address="192.168.2.3", @port=9000) ->
     @connecting = false
     @connectSocket()
-    @commands = []
+    @code = 0
     window.setInterval (=> @nextCode()), @pace
 
   connectSocket: ->
@@ -250,10 +250,10 @@ class BigCar
     @socket.onerror = => @connecting = false
     @socket.onclose = => @connecting = false
     @socket.ondata = (event) =>
-      level = (parseInt(event.data.slice(2), 16) - 2655 ) / 4
+      level = (parseInt(event.data.slice(2), 16) - 2655 ) * 0.20
       @bot.announce battery: level
 
-  drive: (code) -> @commands.push code
+  drive: (@code) ->
 
   code2command: (code) ->
     newCode = "05893476"[code-1]
@@ -262,8 +262,10 @@ class BigCar
 
   nextCode: ->
     if @socket.readyState == "open"
-      if @commands.length > 0
-        @socket.send @code2command @commands.shift()
+      # car will need to be reset if we send excessive stops
+      if @code > -5
+        @socket.send @code2command @code
+        @code -= 1 if @code < 1
     else
       @connectSocket()
       
@@ -337,12 +339,11 @@ class RobotTestMachine extends RobotState
       # start again with a clean slate
       new RobotTestMachine(@driver)
 
-# build my robot and wire up events
-
 bot = new StateTracker()
-bot.setState new RobotTestMachine(new BigCar(bot))
 
 $ ->
+  # build and wire up
+  bot.setState new RobotTestMachine(new BigCar(bot))
   new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset"]
   new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot

@@ -401,7 +401,7 @@ BigCar = (function() {
     this.port = port != null ? port : 9000;
     this.connecting = false;
     this.connectSocket();
-    this.commands = [];
+    this.code = 0;
     window.setInterval(((function(_this) {
       return function() {
         return _this.nextCode();
@@ -433,7 +433,7 @@ BigCar = (function() {
     return this.socket.ondata = (function(_this) {
       return function(event) {
         var level;
-        level = (parseInt(event.data.slice(2), 16) - 2655) / 4;
+        level = (parseInt(event.data.slice(2), 16) - 2655) * 0.20;
         return _this.bot.announce({
           battery: level
         });
@@ -442,7 +442,7 @@ BigCar = (function() {
   };
 
   BigCar.prototype.drive = function(code) {
-    return this.commands.push(code);
+    this.code = code;
   };
 
   BigCar.prototype.code2command = function(code) {
@@ -456,8 +456,11 @@ BigCar = (function() {
 
   BigCar.prototype.nextCode = function() {
     if (this.socket.readyState === "open") {
-      if (this.commands.length > 0) {
-        return this.socket.send(this.code2command(this.commands.shift()));
+      if (this.code > -5) {
+        this.socket.send(this.code2command(this.code));
+        if (this.code < 1) {
+          return this.code -= 1;
+        }
       }
     } else {
       return this.connectSocket();
@@ -632,9 +635,8 @@ RobotTestMachine = (function(_super) {
 
 bot = new StateTracker();
 
-bot.setState(new RobotTestMachine(new BigCar(bot)));
-
 $(function() {
+  bot.setState(new RobotTestMachine(new BigCar(bot)));
   new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset"]);
   new CrashAnnouncer("crash", bot);
   new OrientationAnnouncer("orientation", bot);
