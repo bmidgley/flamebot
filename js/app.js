@@ -119,12 +119,14 @@ RobotSequentialState = (function(_super) {
         return null;
       }
       return this.behaviors[this.counter] || this.parent;
-    }, function(oldState, currentState) {
-      if (currentState !== this) {
-        return;
-      }
-      return this.counter = this.contains(oldState) ? (this.counter || -1) + 1 : 0;
-    });
+    }, (function(_this) {
+      return function(oldState, currentState) {
+        if (currentState !== _this) {
+          return;
+        }
+        return _this.counter = _this.contains(oldState) ? (_this.counter || -1) + 1 : 0;
+      };
+    })(this));
   }
 
   return RobotSequentialState;
@@ -190,26 +192,28 @@ RobotPhotographingState = (function(_super) {
   function RobotPhotographingState(name, goals, filename) {
     RobotPhotographingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       return this.parent;
-    }, function(oldState, currentState) {
-      var options;
-      if (currentState !== this) {
-        return;
-      }
-      options = {
-        camera: navigator.mozCameras.getListOfCameras()[0]
-      };
-      return naigator.mozCameras.getCamera(options, function(camera) {
-        var poptions;
-        poptions = {
-          rotation: 90,
-          pictureSize: camera.capabilities.pictureSizes[0],
-          fileFormat: camera.capabilities.fileFormats[0]
+    }, (function(_this) {
+      return function(oldState, currentState) {
+        var options;
+        if (currentState !== _this) {
+          return;
+        }
+        options = {
+          camera: navigator.mozCameras.getListOfCameras()[0]
         };
-        return camera.takePicture(poptions, function(blob) {
-          return navigator.getDeviceStorage('pictures').addNamed(blob, filename);
+        return naigator.mozCameras.getCamera(options, function(camera) {
+          var poptions;
+          poptions = {
+            rotation: 90,
+            pictureSize: camera.capabilities.pictureSizes[0],
+            fileFormat: camera.capabilities.fileFormats[0]
+          };
+          return camera.takePicture(poptions, function(blob) {
+            return navigator.getDeviceStorage('pictures').addNamed(blob, filename);
+          });
         });
-      });
-    });
+      };
+    })(this));
   }
 
   return RobotPhotographingState;
@@ -224,6 +228,8 @@ RobotFindingState = (function(_super) {
     this.location = location;
     this.perimeter = perimeter != null ? perimeter : 1;
     this.compass_variance = compass_variance != null ? compass_variance : 20;
+    console.log("creating a findingstate with location");
+    console.log(this.location);
     RobotFindingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       var d, newState;
       if (event.location) {

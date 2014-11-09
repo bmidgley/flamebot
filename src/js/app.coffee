@@ -63,7 +63,7 @@ class RobotSequentialState extends RobotState
       # only modify the current state if it is me
       return null if currentState != @
       return @behaviors[@counter] || @parent
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       # sequence is initialized/incremented if reached from a descendant
       # and reset if we entered from elsewhere
       return unless currentState == @
@@ -104,7 +104,7 @@ class RobotPhotographingState extends RobotState
   constructor: (name, goals, filename) ->
     super name, goals, (currentState, event) ->
       @parent
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       return unless currentState == @
       options = camera: navigator.mozCameras.getListOfCameras()[0]
       naigator.mozCameras.getCamera options, (camera) ->
@@ -118,6 +118,8 @@ class RobotPhotographingState extends RobotState
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
   constructor: (@driver, name, goals, @location, @perimeter=1, @compass_variance=20) ->
+    console.log "creating a findingstate with location"
+    console.log @location
     super name, goals, (currentState, event) ->
       # location
       if event.location
@@ -329,7 +331,7 @@ class TimeAnnouncer extends Announcer
     @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
 
 # build my robot's state machine
-# todo: low-grade location is accepted
+# todo: low-grade location might be accepted
 class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
     super "waiting", ["stop"], =>
