@@ -136,28 +136,28 @@ RobotTimeLimit = (function(_super) {
 
   function RobotTimeLimit(name, goals, duration) {
     this.duration = duration;
-    RobotTimeLimit.__super__.constructor.call(this, name, goals, (function(_this) {
-      return function(currentState, event) {
-        _this.elapsed = 0;
-        if (event.timer) {
-          console.log("comparing elapsed " + _this.elapsed + " with duration " + _this.duration);
-          _this.elapsed += event.timer;
-          if (_this.elapsed > _this.duration) {
-            _this.elapsed = 0;
-            return _this.parent;
-          }
+    this.elapsed = 0;
+    RobotTimeLimit.__super__.constructor.call(this, name, goals, function(currentState, event) {
+      if (event.timer) {
+        console.log("comparing elapsed " + this.elapsed + " with duration " + this.duration);
+        this.elapsed += event.timer;
+        if (this.elapsed > this.duration) {
+          this.elapsed = 0;
+          return this.parent;
         }
-        if (currentState === _this) {
-          console.log("limit's child completed; passing back to parent");
-          return _this.parent;
-        }
-        return null;
-      };
-    })(this), function(oldState, currentState) {
-      if (!this.contains(oldState)) {
-        return this.elapsed = 0;
       }
-    });
+      if (currentState === this) {
+        console.log("limit's child completed; passing back to parent");
+        return this.parent;
+      }
+      return null;
+    }, (function(_this) {
+      return function(oldState, currentState) {
+        if (!_this.contains(oldState)) {
+          return _this.elapsed = 0;
+        }
+      };
+    })(this));
   }
 
   return RobotTimeLimit;
@@ -346,7 +346,7 @@ RobotBatteryLimit = (function(_super) {
 ButtonWatcher = (function(_super) {
   __extends(ButtonWatcher, _super);
 
-  function ButtonWatcher(name, goals) {
+  function ButtonWatcher(name, goals, entering) {
     ButtonWatcher.__super__.constructor.call(this, name, goals, function(currentState, event) {
       if (event.button) {
         return currentState.findHandler(event.button);
@@ -355,7 +355,7 @@ ButtonWatcher = (function(_super) {
         console.log("battery is now " + event.battery);
       }
       return null;
-    });
+    }, entering);
   }
 
   return ButtonWatcher;
@@ -641,12 +641,22 @@ RobotTestMachine = (function(_super) {
 
   function RobotTestMachine(driver) {
     this.driver = driver;
-    RobotTestMachine.__super__.constructor.call(this, "waiting", ["stop"]);
-    this.driver.drive(0);
+    RobotTestMachine.__super__.constructor.call(this, "waiting", ["stop"], (function(_this) {
+      return function() {
+        return _this.driver.drive(0);
+      };
+    })(this));
     this.limited = this.addChild(new RobotTimeLimit("limiting", [], 180));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
     this.limited.addChild(new RobotFlaggingState(this.driver, "storing", ["store"], this.sequence));
+    this.limited.addChild(new RobotState("driving", ["drive"], (function() {
+      return null;
+    }), ((function(_this) {
+      return function() {
+        return _this.driver.drive(1);
+      };
+    })(this))));
     this.addChild(new RobotState("resetting", ["reset"], (function(_this) {
       return function(currentState, event) {
         return new RobotTestMachine(_this.driver);
@@ -662,7 +672,7 @@ bot = new StateTracker();
 
 $(function() {
   bot.setState(new RobotTestMachine(new BigCar(bot)));
-  new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset"]);
+  new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive"]);
   new CrashAnnouncer("crash", bot);
   new OrientationAnnouncer("orientation", bot);
   new LocationAnnouncer("location", bot);

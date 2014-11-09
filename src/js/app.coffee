@@ -72,8 +72,8 @@ class RobotSequentialState extends RobotState
 # limit time spent on an activity
 class RobotTimeLimit extends RobotState
   constructor: (name, goals, @duration) ->
-    super name, goals, (currentState, event) =>
-      @elapsed = 0
+    @elapsed = 0
+    super name, goals, (currentState, event) ->
       if event.timer
         console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
         @elapsed += event.timer
@@ -84,7 +84,7 @@ class RobotTimeLimit extends RobotState
         console.log "limit's child completed; passing back to parent"
         return @parent
       null
-    , (oldState, currentState) ->
+    , (oldState, currentState) =>
       # if the state was an ancestor before, need to reset the timer
       unless @contains oldState
         @elapsed = 0
@@ -201,11 +201,12 @@ class RobotBatteryLimit extends RobotState
 
 # base button handler and some debug
 class ButtonWatcher extends RobotState
-  constructor: (name, goals) ->
+  constructor: (name, goals, entering) ->
     super name, goals, (currentState, event) ->
       return currentState.findHandler(event.button) if event.button
       console.log("battery is now #{event.battery}") if event.battery
       return null
+    , entering
 
 # keep track of state
 class StateTracker
@@ -328,19 +329,18 @@ class TimeAnnouncer extends Announcer
     @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
 
 # build my robot's state machine
-# todo: only stops when we construct this but not when we enter it
 # todo: low-grade location is accepted
-# todo: limit's elapsed is always 0
 class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
-    super "waiting", ["stop"]
-    @driver.drive 0
+    super "waiting", ["stop"], =>
+      @driver.drive 0
 
     @limited = @addChild new RobotTimeLimit "limiting", [], 180
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
     @sequence.addForward = false
 
     @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
+    @limited.addChild new RobotState "driving", ["drive"], (-> null), (=> @driver.drive 1)
 
     @addChild new RobotState "resetting", ["reset"], (currentState, event) =>
       # start again with a clean slate
@@ -351,7 +351,7 @@ bot = new StateTracker()
 $ ->
   # build and wire up
   bot.setState new RobotTestMachine(new BigCar(bot))
-  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset"]
+  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive"]
   new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot
   new LocationAnnouncer "location", bot
