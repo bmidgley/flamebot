@@ -344,9 +344,8 @@ class RobotTestMachine extends ButtonWatcher
     @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
     @limited.addChild new RobotState "driving", ["drive"], (-> null), (=> @driver.drive 1)
 
-    @addChild new RobotState "resetting", ["reset"], (currentState, event) =>
-      # start again with a clean slate
-      new RobotTestMachine(@driver)
+    # start again with a clean slate
+    @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
 bot = new StateTracker()
 

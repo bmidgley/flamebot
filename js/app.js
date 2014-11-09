@@ -664,7 +664,7 @@ RobotTestMachine = (function(_super) {
       };
     })(this))));
     this.addChild(new RobotState("resetting", ["reset"], (function(_this) {
-      return function(currentState, event) {
+      return function() {
         return new RobotTestMachine(_this.driver);
       };
     })(this)));
