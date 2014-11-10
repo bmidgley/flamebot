@@ -332,19 +332,30 @@ class TimeAnnouncer extends Announcer
 
 # build my robot's state machine
 # todo: low-grade location might be accepted
+# todo: firefox flame phone does not reverse the compass but zte open does--detect and adjust
+
+# extending buttonwatcher as the toplevel state so that buttons can override anything
 class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
-    super "waiting", ["stop"], =>
-      @driver.drive 0
 
+    # waiting state responds to "stop" goal and when entered it stops the car
+    super "waiting", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
+
+    # activities under limited should be allowed 180 seconds to complete, then aborted
     @limited = @addChild new RobotTimeLimit "limiting", [], 180
+
+    # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
     @sequence.addForward = false
 
+    # hitting the store button goes here and drops a flag under the sequence state
     @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
-    @limited.addChild new RobotState "driving", ["drive"], (-> null), (=> @driver.drive 1)
 
-    # start again with a clean slate
+    # simply engage the motor, subject to the time limit above
+    @limited.addChild new RobotState "driving", ["drive"], null, (=> @driver.drive 1)
+
+    # the reset button is special... it constructs a brand new state machine (with no flags)
+    # and sends in the same driver for reuse
     @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
 bot = new StateTracker()

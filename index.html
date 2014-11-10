@@ -90,31 +90,27 @@
     <div data-role="header" data-position="fixed">
         <a href="#home" data-rel="back" data-icon="arrow-l">back</a>
 
-        <h1>Behavior: Operating</h1>
+        <h1>Behavior: Waiting</h1>
         <a href="#editDesign" data-rel="dialog" data-role="button" data-inline="true">Rename</a>
     </div>
 
     <div data-role="content">
+        <p>Entering this state: <b>turn off engine</b></p>
         <b>Listeners</b>
         <a href="#addListener" data-rel="dialog" data-role="button" data-icon="plus" data-iconpos="notext" data-theme="a"
            data-inline="true">+listener</a>
         <ul data-role="listview" data-inset="true" data-theme="d">
             <li><a href="#s2">
                 <h3>If: Battery drops below 50</h3>
-
-                <p>Do: Disable camera, Send message return-home</p>
-
                 <p>Then start: Returning</p>
             </a></li>
             <li><a href="#s3">
                 <h3>If: Destination came within 5</h3>
-
-                <p>Do: pop location from stack</p>
+                <p>Then start: Circling</p>
             </a></li>
             <li><a href="#s4">
-                <h3>If: Last destination was used</h3>
-
-                <p>Then start: Returning</p>
+                <h3>If: No progress in 120 seconds</h3>
+                <p>Then start: Calling for help</p>
             </a></li>
         </ul>
 
@@ -122,7 +118,7 @@
         <a href="#addActivity" data-role="button" data-icon="plus" data-iconpos="notext" data-theme="a"
            data-inline="true">My button</a>
         <ul data-role="listview" data-inset="true" data-theme="d">
-            <li><a href="#">Searching</a></li>
+            <li><a href="#">Circling</a></li>
             <li><a href="#">Returning</a></li>
             <li><a href="#">Calling for help</a></li>
         </ul>
@@ -151,7 +147,7 @@
     </div>
 
     <div style="padding:10px 20px;">
-        if, do, then
+        if... then start...
 
         <button type="submit" data-theme="b">Save</button>
     </div>

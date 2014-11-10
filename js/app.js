@@ -648,17 +648,17 @@ RobotTestMachine = (function(_super) {
   function RobotTestMachine(driver) {
     this.driver = driver;
     RobotTestMachine.__super__.constructor.call(this, "waiting", ["stop"], (function(_this) {
-      return function() {
-        return _this.driver.drive(0);
+      return function(oldState, currentState) {
+        if (currentState === _this) {
+          return _this.driver.drive(0);
+        }
       };
     })(this));
     this.limited = this.addChild(new RobotTimeLimit("limiting", [], 180));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
     this.limited.addChild(new RobotFlaggingState(this.driver, "storing", ["store"], this.sequence));
-    this.limited.addChild(new RobotState("driving", ["drive"], (function() {
-      return null;
-    }), ((function(_this) {
+    this.limited.addChild(new RobotState("driving", ["drive"], null, ((function(_this) {
       return function() {
         return _this.driver.drive(1);
       };
