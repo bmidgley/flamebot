@@ -29,14 +29,18 @@ RobotState = (function() {
     var newState;
     if (this.parent) {
       newState = this.parent.processEvent(currentState, event);
+      if (newState) {
+        return newState;
+      }
     }
-    if (!newState) {
+    if (this.listener) {
       newState = this.listener(currentState, event);
       if (newState) {
         newState.enterAll(currentState, newState);
+        return newState;
       }
     }
-    return newState;
+    return null;
   };
 
   RobotState.prototype.enterAll = function(oldState, currentState) {
@@ -141,7 +145,6 @@ RobotTimeLimit = (function(_super) {
     this.elapsed = 0;
     RobotTimeLimit.__super__.constructor.call(this, name, goals, function(currentState, event) {
       if (event.timer) {
-        console.log("comparing elapsed " + this.elapsed + " with duration " + this.duration);
         this.elapsed += event.timer;
         if (this.elapsed > this.duration) {
           this.elapsed = 0;
@@ -255,30 +258,27 @@ RobotFindingState = (function(_super) {
       return newState;
     }, (function(_this) {
       return function(oldState, currentState) {
-        if (currentState !== _this) {
-          return;
+        if (currentState === _this) {
+          return _this.driver.drive(1);
         }
-        return _this.driver.drive(1);
       };
     })(this));
-    this.left_turning = this.addChild(new RobotState("" + this.name + ": left-turn", ["left-turn"], function(currentState, event) {
+    this.left_turning = this.addChild(new RobotState("" + this.name + ": left-turn", ["left-turn"], (function() {
       return null;
-    }, (function(_this) {
+    }), (function(_this) {
       return function(oldState, currentState) {
-        if (currentState !== _this) {
-          return;
+        if (currentState === _this) {
+          return _this.driver.drive(5);
         }
-        return _this.driver.drive(5);
       };
     })(this)));
-    this.right_turning = this.addChild(new RobotState("" + this.name + ": right-turn", ["right-turn"], function(currentState, event) {
+    this.right_turning = this.addChild(new RobotState("" + this.name + ": right-turn", ["right-turn"], (function() {
       return null;
-    }, (function(_this) {
+    }), (function(_this) {
       return function(oldState, currentState) {
-        if (currentState !== _this) {
-          return;
+        if (currentState === _this) {
+          return _this.driver.drive(6);
         }
-        return _this.driver.drive(6);
       };
     })(this)));
   }
@@ -292,7 +292,7 @@ RobotFindingState = (function(_super) {
   };
 
   RobotFindingState.prototype.correction = function() {
-    var bearing;
+    var bearing, relative;
     if (!this.compass_reading) {
       return 0;
     }
@@ -300,7 +300,9 @@ RobotFindingState = (function(_super) {
       return 0;
     }
     bearing = this.bearing(this.location, this.current_location);
-    return ((360 + this.compass_reading - bearing) % 360) - 180;
+    relative = ((360 + this.compass_reading - bearing) % 360) - 180;
+    console.log("goal is bearing " + bearing + " from compass " + this.compass_reading + " relative direction is " + relative);
+    return relative;
   };
 
   RobotFindingState.prototype.bearing = function(a, b) {
@@ -356,9 +358,6 @@ ButtonWatcher = (function(_super) {
     ButtonWatcher.__super__.constructor.call(this, name, goals, function(currentState, event) {
       if (event.button) {
         return currentState.findHandler(event.button);
-      }
-      if (event.battery) {
-        console.log("battery is now " + event.battery);
       }
       return null;
     }, entering);
@@ -654,15 +653,19 @@ RobotTestMachine = (function(_super) {
         }
       };
     })(this));
-    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 180));
+    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 30));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
+    this.sequence.addChild(new RobotFindingState(this.driver, "trailhead", [], {
+      latitude: 40.460304,
+      longitude: -111.797706
+    }));
     this.limited.addChild(new RobotFlaggingState(this.driver, "storing", ["store"], this.sequence));
-    this.limited.addChild(new RobotState("driving", ["drive"], null, ((function(_this) {
+    this.limited.addChild(new RobotState("driving", ["drive"], null, (function(_this) {
       return function() {
         return _this.driver.drive(1);
       };
-    })(this))));
+    })(this)));
     this.addChild(new RobotState("resetting", ["reset"], (function(_this) {
       return function() {
         return new RobotTestMachine(_this.driver);

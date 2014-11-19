@@ -17,11 +17,13 @@ class RobotState
   processEvent: (currentState, event) ->
     if @parent
       newState = @parent.processEvent(currentState, event)
-    unless newState
+      return newState if newState
+    if @listener
       newState = @listener(currentState, event)
       if newState
         newState.enterAll(currentState, newState)
-    newState
+        return newState
+    null
 
   enterAll: (oldState, currentState) ->
     @parent.enterAll(oldState, currentState) if @parent
@@ -75,7 +77,7 @@ class RobotTimeLimit extends RobotState
     @elapsed = 0
     super name, goals, (currentState, event) ->
       if event.timer
-        console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
+        #console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
         @elapsed += event.timer
         if @elapsed > @duration
           @elapsed = 0
@@ -145,22 +147,15 @@ class RobotFindingState extends RobotState
       return null if currentState == newState
       return newState
     , (oldState, currentState) =>
-      return unless currentState == @
-      @driver.drive 1
+      @driver.drive 1 if currentState == @
 
-    @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"],
-    (currentState, event) ->
-      null
-    , (oldState, currentState) =>
-      return unless currentState == @
-      @driver.drive 5
+    @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"], (-> null),
+    (oldState, currentState) =>
+      @driver.drive 5 if currentState == @
 
-    @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"],    
-    (currentState, event) ->
-      null
-    , (oldState, currentState) =>
-      return unless currentState == @
-      @driver.drive 6
+    @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"], ( -> null),
+    (oldState, currentState) =>
+      @driver.drive 6 if currentState == @
 
   toRadians: (r) ->
     r * Math.PI / 180.0
@@ -174,7 +169,9 @@ class RobotFindingState extends RobotState
     return 0 unless @compass_reading
     return 0 unless @current_location
     bearing = @bearing @location, @current_location
-    ((360 + @compass_reading - bearing) % 360) - 180
+    relative = ((360 + @compass_reading - bearing) % 360) - 180
+    console.log "goal is bearing #{bearing} from compass #{@compass_reading} relative direction is #{relative}"
+    return relative
 
   bearing: (a, b) ->
     lat1 = @toRadians(a.latitude)
@@ -195,6 +192,7 @@ class RobotFindingState extends RobotState
     return d
 
 # end an activity when battery drops too low
+# todo: average out the readings
 class RobotBatteryLimit extends RobotState
   constructor: (name, goals, @threshold) ->
     super name, goals, (currentState, event) ->
@@ -206,7 +204,7 @@ class ButtonWatcher extends RobotState
   constructor: (name, goals, entering) ->
     super name, goals, (currentState, event) ->
       return currentState.findHandler(event.button) if event.button
-      console.log("battery is now #{event.battery}") if event.battery
+      #console.log("battery is now #{event.battery}") if event.battery
       return null
     , entering
 
@@ -341,18 +339,21 @@ class RobotTestMachine extends ButtonWatcher
     # waiting state responds to "stop" goal and when entered it stops the car
     super "waiting", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
 
-    # activities under limited should be allowed 180 seconds to complete, then aborted
-    @limited = @addChild new RobotTimeLimit "limiting", [], 180
+    # activities under limited should be allowed 30 seconds to complete, then aborted
+    @limited = @addChild new RobotTimeLimit "limiting", [], 30
 
     # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
     @sequence.addForward = false
 
+    # plot a known final destination for debugging
+    @sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
+
     # hitting the store button goes here and drops a flag under the sequence state
     @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
-    @limited.addChild new RobotState "driving", ["drive"], null, (=> @driver.drive 1)
+    @limited.addChild new RobotState "driving", ["drive"], null, => @driver.drive 1
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse

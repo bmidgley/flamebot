@@ -1,7 +1,7 @@
 {
   "version": "0.3",
-  "name": "firebot",
-  "description": "firebot controller",
+  "name": "flamebot",
+  "description": "flamebot robot controller",
   "launch_path": "/index.html",
   "icons": {
     "16": "/app-icons/icon-16.png",
