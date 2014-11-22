@@ -1,3 +1,4 @@
+# robot states use/extend RobotState
 class RobotState
   constructor: (@name, @goals, @listener, @entering) ->
     @behaviors = []
@@ -20,9 +21,7 @@ class RobotState
       return newState if newState
     if @listener
       newState = @listener(currentState, event)
-      if newState
-        newState.enterAll(currentState, newState)
-        return newState
+      return newState if newState
     null
 
   enterAll: (oldState, currentState) ->
@@ -49,6 +48,14 @@ class RobotState
     for child in @behaviors
       return true if child.contains(target)
     return false
+
+  accordian: (target, event) ->
+    collapsed = if (target != @ && @contains(target)) then "false" else "true"
+    x = "<div data-role='collapsible' data-collapsed='#{collapsed}'><h3>#{if target == @ then @name + event else @name}</h3>"
+    for child in @behaviors
+      x += child.accordian(target, event)
+    x += '</div>'
+    return x
 
 # loop forever state
 class RobotLoopState extends RobotState
@@ -208,23 +215,29 @@ class ButtonWatcher extends RobotState
       return null
     , entering
 
+
 # keep track of state
 class StateTracker
-  constructor: ->
+  constructor: (@notifier) ->
 
-  setState: (@state) ->
-    @state.enterAll(null, @state)
-    @showState()
+  # only the state argument is required
+  setState: (@state, oldState, event) ->
+    @state.enterAll(oldState, @state)
+    @notifier(@state, event) if @notifier
 
   announce: (event) ->
     return unless @state
     newState = @state.processEvent(@state, event)
-    if newState
-      @state = newState
-      @showState()
+    @setState(newState, @state, event) if newState
 
-  showState: ->
-    console.log "entered state #{@state.name}"
+
+# everyone needs one of these
+class ImaginaryCar
+  constructor: (@bot) ->
+
+  drive: (code) ->
+    console.log "drive(#{code})"
+    @bot.announce battery: 11
 
 
 # LittleCar aka iRacer
@@ -256,8 +269,15 @@ class BigCar
 
   connectSocket: ->
     return if @connecting
+    try
+      @socket = navigator.mozTCPSocket.open(@address, @port)
+    catch error
+      return if @warned
+      console.log "cannot open a tcp socket"
+      console.log error
+      @warned = true
+      return
     @connecting = true
-    @socket = navigator.mozTCPSocket.open(@address, @port)
     @socket.onopen = => @connecting = false
     @socket.onerror = => @connecting = false
     @socket.onclose = => @connecting = false
@@ -273,7 +293,7 @@ class BigCar
     return "$?"
 
   nextCode: ->
-    if @socket.readyState == "open"
+    if @socket && @socket.readyState == "open"
       # car will need to be reset if we send excessive stops
       if @code > -5
         @socket.send @code2command @code
@@ -281,10 +301,13 @@ class BigCar
     else
       @connectSocket()
       
+
+# Announcers deliver events to a bot
 class Announcer
   constructor: (@name, @bot) ->
     console.log "tracking #{@name} events"
 
+# wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
   constructor: (name, bot, buttons) ->
     super name, bot
@@ -292,6 +315,7 @@ class ButtonAnnouncer extends Announcer
       do (action) ->
         $("##{action}-button").click => @bot.announce button: action
 
+# announce a crash if the accelerometer seems to indicate it
 class CrashAnnouncer extends Announcer
   constructor: (name, bot, @magnitude = 25, @mininterval = 1000000) ->
     super name, bot
@@ -350,7 +374,7 @@ class RobotTestMachine extends ButtonWatcher
     @sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState @driver, "storing", ["store"], @sequence
+    @limited.addChild new RobotFlaggingState @driver, "waypoint", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
     @limited.addChild new RobotState "driving", ["drive"], null, => @driver.drive 1
@@ -359,7 +383,16 @@ class RobotTestMachine extends ButtonWatcher
     # and sends in the same driver for reuse
     @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
-bot = new StateTracker()
+bot = new StateTracker (state, event) ->
+  console.log event
+  console.log "pushed state to #{state.name}"
+  lastevent = if event
+    eventkey = Object.keys(event)[0]
+    eventval = event[eventkey]
+    "<= #{eventkey}:#{eventval}"
+  else
+    "***"
+  $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh")
 
 $ ->
   # build and wire up
