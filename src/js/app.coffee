@@ -51,7 +51,7 @@ class RobotState
 
   accordian: (target, event) ->
     collapsed = if (target != @ && @contains(target)) then "false" else "true"
-    x = "<div data-role='collapsible' data-collapsed='#{collapsed}'><h3>#{if target == @ then @name + event else @name}</h3>"
+    x = "<div data-role='collapsible' data-collapsed='#{collapsed}' data-theme='b'><h3>#{if target == @ then "*#{@name}#{event}" else @name}</h3>"
     for child in @behaviors
       x += child.accordian(target, event)
     x += '</div>'
@@ -100,10 +100,10 @@ class RobotTimeLimit extends RobotState
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (driver, name, goals, @target) ->
+  constructor: (driver, name, flagname, goals, @target) ->
     super name, goals, (currentState, event) ->
       if event.location
-        finder = @target.addChild new RobotFindingState(driver, "flag: #{name}", [], event.location.coords)
+        finder = @target.addChild new RobotFindingState(driver, flagname, [], event.location.coords)
         console.log finder
         return @parent
       null
@@ -360,8 +360,8 @@ class TimeAnnouncer extends Announcer
 class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
 
-    # waiting state responds to "stop" goal and when entered it stops the car
-    super "waiting", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
+    # ready state responds to "stop" goal and when entered it stops the car
+    super "ready", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
 
     # activities under limited should be allowed 30 seconds to complete, then aborted
     @limited = @addChild new RobotTimeLimit "limiting", [], 30
@@ -374,7 +374,7 @@ class RobotTestMachine extends ButtonWatcher
     @sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState @driver, "waypoint", ["store"], @sequence
+    @limited.addChild new RobotFlaggingState @driver, "storing", "point", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
     @limited.addChild new RobotState "driving", ["drive"], null, => @driver.drive 1
@@ -389,9 +389,9 @@ bot = new StateTracker (state, event) ->
   lastevent = if event
     eventkey = Object.keys(event)[0]
     eventval = event[eventkey]
-    "<= #{eventkey}:#{eventval}"
+    " #{eventkey}:#{eventval}"
   else
-    "***"
+    ""
   $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh")
 
 $ ->

@@ -96,7 +96,7 @@ RobotState = (function() {
   RobotState.prototype.accordian = function(target, event) {
     var child, collapsed, x, _i, _len, _ref;
     collapsed = target !== this && this.contains(target) ? "false" : "true";
-    x = "<div data-role='collapsible' data-collapsed='" + collapsed + "'><h3>" + (target === this ? this.name + event : this.name) + "</h3>";
+    x = "<div data-role='collapsible' data-collapsed='" + collapsed + "' data-theme='b'><h3>" + (target === this ? "*" + this.name + event : this.name) + "</h3>";
     _ref = this.behaviors;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       child = _ref[_i];
@@ -184,12 +184,12 @@ RobotTimeLimit = (function(_super) {
 RobotFlaggingState = (function(_super) {
   __extends(RobotFlaggingState, _super);
 
-  function RobotFlaggingState(driver, name, goals, target) {
+  function RobotFlaggingState(driver, name, flagname, goals, target) {
     this.target = target;
     RobotFlaggingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       var finder;
       if (event.location) {
-        finder = this.target.addChild(new RobotFindingState(driver, "flag: " + name, [], event.location.coords));
+        finder = this.target.addChild(new RobotFindingState(driver, flagname, [], event.location.coords));
         console.log(finder);
         return this.parent;
       }
@@ -685,7 +685,7 @@ RobotTestMachine = (function(_super) {
 
   function RobotTestMachine(driver) {
     this.driver = driver;
-    RobotTestMachine.__super__.constructor.call(this, "waiting", ["stop"], (function(_this) {
+    RobotTestMachine.__super__.constructor.call(this, "ready", ["stop"], (function(_this) {
       return function(oldState, currentState) {
         if (currentState === _this) {
           return _this.driver.drive(0);
@@ -699,7 +699,7 @@ RobotTestMachine = (function(_super) {
       latitude: 40.460304,
       longitude: -111.797706
     }));
-    this.limited.addChild(new RobotFlaggingState(this.driver, "waypoint", ["store"], this.sequence));
+    this.limited.addChild(new RobotFlaggingState(this.driver, "storing", "point", ["store"], this.sequence));
     this.limited.addChild(new RobotState("driving", ["drive"], null, (function(_this) {
       return function() {
         return _this.driver.drive(1);
@@ -720,7 +720,7 @@ bot = new StateTracker(function(state, event) {
   var eventkey, eventval, lastevent;
   console.log(event);
   console.log("pushed state to " + state.name);
-  lastevent = event ? (eventkey = Object.keys(event)[0], eventval = event[eventkey], "<= " + eventkey + ":" + eventval) : "***";
+  lastevent = event ? (eventkey = Object.keys(event)[0], eventval = event[eventkey], " " + eventkey + ":" + eventval) : "";
   return $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh");
 });
 
