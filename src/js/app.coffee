@@ -116,7 +116,7 @@ class RobotPhotographingState extends RobotState
     , (oldState, currentState) =>
       return unless currentState == @
       options = camera: navigator.mozCameras.getListOfCameras()[0]
-      naigator.mozCameras.getCamera options, (camera) ->
+      navigator.mozCameras.getCamera options, (camera) ->
         poptions =
           rotation: 90
           pictureSize: camera.capabilities.pictureSizes[0]
@@ -393,6 +393,9 @@ class RobotTestMachine extends ButtonWatcher
     # and sends in the same driver for reuse
     @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
+    # shoot a picture
+    @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
+
 bot = new StateTracker (state, event) ->
   console.log "pushed state to #{state.name}"
   lastevent = if event
@@ -406,7 +409,7 @@ bot = new StateTracker (state, event) ->
 $ ->
   # build and wire up
   bot.setState new RobotTestMachine(new BigCar(bot))
-  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive"]
+  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]
   new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot
   new LocationAnnouncer "location", bot

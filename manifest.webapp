@@ -31,5 +31,5 @@
       "description": "Required to send commands to robot or car"
     }
   },
-  "type": "privileged"
+  "type": "certified"
 }

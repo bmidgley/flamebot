@@ -216,7 +216,7 @@ RobotPhotographingState = (function(_super) {
         options = {
           camera: navigator.mozCameras.getListOfCameras()[0]
         };
-        return naigator.mozCameras.getCamera(options, function(camera) {
+        return navigator.mozCameras.getCamera(options, function(camera) {
           var poptions;
           poptions = {
             rotation: 90,
@@ -721,6 +721,7 @@ RobotTestMachine = (function(_super) {
         return new RobotTestMachine(_this.driver);
       };
     })(this)));
+    this.addChild(new RobotPhotographingState("shooting", ["shoot"], "picture1"));
   }
 
   return RobotTestMachine;
@@ -736,7 +737,7 @@ bot = new StateTracker(function(state, event) {
 
 $(function() {
   bot.setState(new RobotTestMachine(new BigCar(bot)));
-  new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive"]);
+  new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]);
   new CrashAnnouncer("crash", bot);
   new OrientationAnnouncer("orientation", bot);
   new LocationAnnouncer("location", bot);
