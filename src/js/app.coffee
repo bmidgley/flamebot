@@ -140,7 +140,14 @@ class RobotFindingState extends RobotState
 
       # compass
       if event.orientation
-        @compass_reading = event.orientation.alpha
+        declination = 13
+        @compass_reading = (630 - event.orientation.alpha) % 360
+        if @debug
+          console.log "true orientation: #{@compass_reading}"
+          @debug = false
+
+      if event.timer
+        @debug2 = true
 
       newState = @
 
@@ -156,11 +163,11 @@ class RobotFindingState extends RobotState
     , (oldState, currentState) =>
       @driver.drive 1 if currentState == @
 
-    @left_turning = @addChild new RobotState "#{@name}: left-turn", ["left-turn"], (-> null),
+    @left_turning = @addChild new RobotState "left", [], (-> null),
     (oldState, currentState) =>
       @driver.drive 5 if currentState == @
 
-    @right_turning = @addChild new RobotState "#{@name}: right-turn", ["right-turn"], ( -> null),
+    @right_turning = @addChild new RobotState "right", [], ( -> null),
     (oldState, currentState) =>
       @driver.drive 6 if currentState == @
 
@@ -175,9 +182,11 @@ class RobotFindingState extends RobotState
     # return 0 if we don't know which way we need to turn
     return 0 unless @compass_reading
     return 0 unless @current_location
-    bearing = @bearing @location, @current_location
+    bearing = @bearing @current_location, @location
     relative = ((360 + @compass_reading - bearing) % 360) - 180
-    console.log "goal is bearing #{bearing} from compass #{@compass_reading} relative direction is #{relative}"
+    if @debug2
+      console.log "=bearing #{bearing} from compass #{@compass_reading} off by #{relative}. #{@current_location.latitude},#{@current_location.longitude} to #{@location.latitude},#{@location.longitude}"
+      @debug2 = false
     return relative
 
   bearing: (a, b) ->
@@ -344,7 +353,8 @@ class OrientationAnnouncer extends Announcer
 class LocationAnnouncer extends Announcer
   constructor: (name, bot) ->
     super name, bot
-    @watch_id = navigator.geolocation.watchPosition (location) => @bot.announce location: location, -> console.log "geolocation error", enableHighAccuracy: true
+    @watch_id = navigator.geolocation.watchPosition ((location) => @bot.announce location: location), 
+      (-> console.log "geolocation error"), enableHighAccuracy: true
 
 # announce time has passed
 class TimeAnnouncer extends Announcer
@@ -363,8 +373,8 @@ class RobotTestMachine extends ButtonWatcher
     # ready state responds to "stop" goal and when entered it stops the car
     super "ready", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
 
-    # activities under limited should be allowed 30 seconds to complete, then aborted
-    @limited = @addChild new RobotTimeLimit "limiting", [], 30
+    # activities under limited should be allowed some number of seconds to complete, then aborted
+    @limited = @addChild new RobotTimeLimit "limiting", [], 60
 
     # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
@@ -384,7 +394,6 @@ class RobotTestMachine extends ButtonWatcher
     @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
 bot = new StateTracker (state, event) ->
-  console.log event
   console.log "pushed state to #{state.name}"
   lastevent = if event
     eventkey = Object.keys(event)[0]

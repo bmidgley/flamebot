@@ -246,7 +246,7 @@ RobotFindingState = (function(_super) {
     console.log("creating a findingstate with location");
     console.log(this.location);
     RobotFindingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
-      var d, newState;
+      var d, declination, newState;
       if (event.location) {
         this.current_location = event.location.coords;
         if (this.distance(this.current_location, this.location) < this.perimeter) {
@@ -254,7 +254,15 @@ RobotFindingState = (function(_super) {
         }
       }
       if (event.orientation) {
-        this.compass_reading = event.orientation.alpha;
+        declination = 13;
+        this.compass_reading = (630 - event.orientation.alpha) % 360;
+        if (this.debug) {
+          console.log("true orientation: " + this.compass_reading);
+          this.debug = false;
+        }
+      }
+      if (event.timer) {
+        this.debug2 = true;
       }
       newState = this;
       d = this.correction();
@@ -275,7 +283,7 @@ RobotFindingState = (function(_super) {
         }
       };
     })(this));
-    this.left_turning = this.addChild(new RobotState("" + this.name + ": left-turn", ["left-turn"], (function() {
+    this.left_turning = this.addChild(new RobotState("left", [], (function() {
       return null;
     }), (function(_this) {
       return function(oldState, currentState) {
@@ -284,7 +292,7 @@ RobotFindingState = (function(_super) {
         }
       };
     })(this)));
-    this.right_turning = this.addChild(new RobotState("" + this.name + ": right-turn", ["right-turn"], (function() {
+    this.right_turning = this.addChild(new RobotState("right", [], (function() {
       return null;
     }), (function(_this) {
       return function(oldState, currentState) {
@@ -311,9 +319,12 @@ RobotFindingState = (function(_super) {
     if (!this.current_location) {
       return 0;
     }
-    bearing = this.bearing(this.location, this.current_location);
+    bearing = this.bearing(this.current_location, this.location);
     relative = ((360 + this.compass_reading - bearing) % 360) - 180;
-    console.log("goal is bearing " + bearing + " from compass " + this.compass_reading + " relative direction is " + relative);
+    if (this.debug2) {
+      console.log("=bearing " + bearing + " from compass " + this.compass_reading + " off by " + relative + ". " + this.current_location.latitude + "," + this.current_location.longitude + " to " + this.location.latitude + "," + this.location.longitude);
+      this.debug2 = false;
+    }
     return relative;
   };
 
@@ -645,17 +656,17 @@ LocationAnnouncer = (function(_super) {
 
   function LocationAnnouncer(name, bot) {
     LocationAnnouncer.__super__.constructor.call(this, name, bot);
-    this.watch_id = navigator.geolocation.watchPosition((function(_this) {
+    this.watch_id = navigator.geolocation.watchPosition(((function(_this) {
       return function(location) {
         return _this.bot.announce({
           location: location
-        }, function() {
-          return console.log("geolocation error", {
-            enableHighAccuracy: true
-          });
         });
       };
-    })(this));
+    })(this)), (function() {
+      return console.log("geolocation error");
+    }), {
+      enableHighAccuracy: true
+    });
   }
 
   return LocationAnnouncer;
@@ -692,7 +703,7 @@ RobotTestMachine = (function(_super) {
         }
       };
     })(this));
-    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 30));
+    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 60));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
     this.sequence.addChild(new RobotFindingState(this.driver, "trailhead", [], {
@@ -718,7 +729,6 @@ RobotTestMachine = (function(_super) {
 
 bot = new StateTracker(function(state, event) {
   var eventkey, eventval, lastevent;
-  console.log(event);
   console.log("pushed state to " + state.name);
   lastevent = event ? (eventkey = Object.keys(event)[0], eventval = event[eventkey], " " + eventkey + ":" + eventval) : "";
   return $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh");
