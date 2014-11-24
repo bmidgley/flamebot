@@ -110,19 +110,25 @@ class RobotFlaggingState extends RobotState
 
 # shoot a picture and move to parent state
 class RobotPhotographingState extends RobotState
-  constructor: (name, goals, filename) ->
+  constructor: (name, goals, @filename) ->
     super name, goals, (currentState, event) ->
       @parent
     , (oldState, currentState) =>
       return unless currentState == @
-      options = camera: navigator.mozCameras.getListOfCameras()[0]
-      navigator.mozCameras.getCamera options, (camera) ->
+      cname = navigator.mozCameras.getListOfCameras()[0]
+      options = camera: cname
+      console.log "selected Camera: #{cname}"
+      navigator.mozCameras.getCamera options, (camera) =>
+        console.log camera
         poptions =
           rotation: 90
           pictureSize: camera.capabilities.pictureSizes[0]
           fileFormat: camera.capabilities.fileFormats[0]
-        camera.takePicture poptions, (blob) ->
-          navigator.getDeviceStorage('pictures').addNamed(blob, filename)
+        console.log poptions
+        camera.takePicture poptions, (blob) =>
+          console.log blob
+          navigator.getDeviceStorage('pictures').addNamed(blob, @filename)
+      , (e) -> console.log e
 
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
@@ -185,7 +191,7 @@ class RobotFindingState extends RobotState
     bearing = @bearing @current_location, @location
     relative = ((360 + @compass_reading - bearing) % 360) - 180
     if @debug2
-      console.log "=bearing #{bearing} from compass #{@compass_reading} off by #{relative}. #{@current_location.latitude},#{@current_location.longitude} to #{@location.latitude},#{@location.longitude}"
+      console.log "bearing #{bearing} from compass #{@compass_reading} off by #{relative}. #{@current_location.latitude},#{@current_location.longitude} to #{@location.latitude},#{@location.longitude} #{@distance(@current_location, @location)}m"
       @debug2 = false
     return relative
 
@@ -408,7 +414,7 @@ bot = new StateTracker (state, event) ->
 
 $ ->
   # build and wire up
-  bot.setState new RobotTestMachine(new BigCar(bot))
+  bot.setState new RobotTestMachine(new BigCar(bot, 1000))
   new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]
   new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot

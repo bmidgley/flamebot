@@ -205,27 +205,35 @@ RobotPhotographingState = (function(_super) {
   __extends(RobotPhotographingState, _super);
 
   function RobotPhotographingState(name, goals, filename) {
+    this.filename = filename;
     RobotPhotographingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       return this.parent;
     }, (function(_this) {
       return function(oldState, currentState) {
-        var options;
+        var cname, options;
         if (currentState !== _this) {
           return;
         }
+        cname = navigator.mozCameras.getListOfCameras()[0];
         options = {
-          camera: navigator.mozCameras.getListOfCameras()[0]
+          camera: cname
         };
+        console.log("selected Camera: " + cname);
         return navigator.mozCameras.getCamera(options, function(camera) {
           var poptions;
+          console.log(camera);
           poptions = {
             rotation: 90,
             pictureSize: camera.capabilities.pictureSizes[0],
             fileFormat: camera.capabilities.fileFormats[0]
           };
+          console.log(poptions);
           return camera.takePicture(poptions, function(blob) {
-            return navigator.getDeviceStorage('pictures').addNamed(blob, filename);
+            console.log(blob);
+            return navigator.getDeviceStorage('pictures').addNamed(blob, _this.filename);
           });
+        }, function(e) {
+          return console.log(e);
         });
       };
     })(this));
@@ -322,7 +330,7 @@ RobotFindingState = (function(_super) {
     bearing = this.bearing(this.current_location, this.location);
     relative = ((360 + this.compass_reading - bearing) % 360) - 180;
     if (this.debug2) {
-      console.log("=bearing " + bearing + " from compass " + this.compass_reading + " off by " + relative + ". " + this.current_location.latitude + "," + this.current_location.longitude + " to " + this.location.latitude + "," + this.location.longitude);
+      console.log("bearing " + bearing + " from compass " + this.compass_reading + " off by " + relative + ". " + this.current_location.latitude + "," + this.current_location.longitude + " to " + this.location.latitude + "," + this.location.longitude + " " + (this.distance(this.current_location, this.location)) + "m");
       this.debug2 = false;
     }
     return relative;
@@ -736,7 +744,7 @@ bot = new StateTracker(function(state, event) {
 });
 
 $(function() {
-  bot.setState(new RobotTestMachine(new BigCar(bot)));
+  bot.setState(new RobotTestMachine(new BigCar(bot, 1000)));
   new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]);
   new CrashAnnouncer("crash", bot);
   new OrientationAnnouncer("orientation", bot);
