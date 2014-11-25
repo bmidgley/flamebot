@@ -130,6 +130,7 @@ RobotSequentialState = (function(_super) {
   __extends(RobotSequentialState, _super);
 
   function RobotSequentialState(name, goals) {
+    this.counter = -1;
     RobotSequentialState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       if (currentState !== this) {
         return null;
@@ -137,10 +138,12 @@ RobotSequentialState = (function(_super) {
       return this.behaviors[this.counter] || this.parent;
     }, (function(_this) {
       return function(oldState, currentState) {
+        var contained;
         if (currentState !== _this) {
           return;
         }
-        return _this.counter = _this.contains(oldState) ? (_this.counter || -1) + 1 : 0;
+        contained = _this.contains(oldState);
+        return _this.counter = contained ? _this.counter + 1 : 0;
       };
     })(this));
   }
@@ -255,11 +258,14 @@ RobotFindingState = (function(_super) {
     this.perimeter = perimeter != null ? perimeter : 1;
     this.compass_variance = compass_variance != null ? compass_variance : 20;
     RobotFindingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
-      var d, declination, newState;
+      var d, declination, distance, newState;
       if (event.location) {
         this.current_location = event.location.coords;
-        if (this.distance(this.current_location, this.location) < this.perimeter) {
+        distance = this.distance(this.current_location, this.location);
+        if (distance < this.perimeter) {
           return this.parent;
+        } else {
+          console.log("distance " + distance);
         }
       }
       if (event.orientation) {
@@ -271,7 +277,8 @@ RobotFindingState = (function(_super) {
         }
       }
       if (event.timer) {
-        this.debug2 = true;
+        this.debug = false;
+        this.debug2 = false;
       }
       newState = this;
       d = this.correction();
@@ -562,14 +569,12 @@ BigCar = (function() {
     var steering;
     if (this.socket && this.socket.readyState === "open") {
       if (this.code > -5) {
+        console.log("sending drive " + this.code);
         steering = this.steer(this.code);
         if (steering) {
           this.socket.send(this.code2command(steering));
         }
         this.socket.send(this.code2command(this.code));
-        if (steering) {
-          this.socket.send(this.code2command(steering));
-        }
         if (this.code < 1) {
           return this.code -= 1;
         }
@@ -729,7 +734,7 @@ RobotTestMachine = (function(_super) {
         }
       };
     })(this));
-    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 180));
+    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 600));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
     this.limited.addChild(new RobotFlaggingState(this.driver, "storing", "point", ["store"], this.sequence));
@@ -752,13 +757,12 @@ RobotTestMachine = (function(_super) {
 
 bot = new StateTracker(function(state, event) {
   var eventkey, eventval, lastevent;
-  console.log("pushed state to " + state.name);
   lastevent = event ? (eventkey = Object.keys(event)[0], eventval = event[eventkey], " " + eventkey + ":" + eventval) : "";
   return $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh");
 });
 
 $(function() {
-  bot.setState(new RobotTestMachine(new BigCar(bot, 200)));
+  bot.setState(new RobotTestMachine(new BigCar(bot, 500)));
   new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]);
   new OrientationAnnouncer("orientation", bot);
   new LocationAnnouncer("location", bot);

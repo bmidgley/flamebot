@@ -6,6 +6,8 @@ state machine to drive a robot.
 It should soon be ready for a refactor as we're still experimenting to see what patterns 
 work when writing for it.
 
+You need to run a coffeescript compiler if you're going to edit the code: coffee -bcw --output . src/
+
 I presented this in a talk: https://plus.google.com/events/cv4v1h4g1edp0j9abht62ma2bfg
 
 Add events:
@@ -25,4 +27,5 @@ More refactoring:
 * start/stop sounds to indicate state or as an action available on entering
 
 BSD license
-Copyright 2014 Brad Midgley
+Copyright 2014 
+Brad Midgley

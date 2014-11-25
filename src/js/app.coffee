@@ -68,6 +68,7 @@ class RobotLoopState extends RobotState
 # move to each child state in sequence then move to parent state
 class RobotSequentialState extends RobotState
   constructor: (name, goals) ->
+    @counter = -1
     super name, goals, (currentState, event) ->
       # only modify the current state if it is me
       return null if currentState != @
@@ -76,7 +77,8 @@ class RobotSequentialState extends RobotState
       # sequence is initialized/incremented if reached from a descendant
       # and reset if we entered from elsewhere
       return unless currentState == @
-      @counter = if @contains(oldState) then (@counter || -1) + 1 else 0
+      contained = @contains(oldState)
+      @counter = if contained then @counter + 1 else 0
 
   addChild: (state) ->
     state.name += " #{@behaviors.length+1}"
@@ -142,8 +144,11 @@ class RobotFindingState extends RobotState
         @current_location = event.location.coords
 
         # finish if perimeter was broken
-        if @distance(@current_location, @location) < @perimeter
+        distance = @distance(@current_location, @location)
+        if distance < @perimeter
           return @parent
+        else
+          console.log "distance #{distance}"
 
       # compass
       if event.orientation
@@ -154,7 +159,8 @@ class RobotFindingState extends RobotState
           @debug = false
 
       if event.timer
-        @debug2 = true
+        @debug = false
+        @debug2 = false
 
       newState = @
 
@@ -314,10 +320,11 @@ class BigCar
     if @socket && @socket.readyState == "open"
       # car will need to be reset if we send excessive stops
       if @code > -5
+        console.log "sending drive #{@code}"
         steering = @steer @code
         @socket.send @code2command steering if steering
         @socket.send @code2command @code
-        @socket.send @code2command steering if steering
+        #@socket.send @code2command steering if steering
         @code -= 1 if @code < 1
     else
       @connectSocket()
@@ -386,7 +393,7 @@ class RobotTestMachine extends ButtonWatcher
     super "ready", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
 
     # activities under limited should be allowed some number of seconds to complete, then aborted
-    @limited = @addChild new RobotTimeLimit "limiting", [], 180
+    @limited = @addChild new RobotTimeLimit "limiting", [], 600
 
     # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
@@ -409,7 +416,7 @@ class RobotTestMachine extends ButtonWatcher
     @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
 
 bot = new StateTracker (state, event) ->
-  console.log "pushed state to #{state.name}"
+  #console.log "pushed state to #{state.name}"
   lastevent = if event
     eventkey = Object.keys(event)[0]
     eventval = event[eventkey]
@@ -420,7 +427,7 @@ bot = new StateTracker (state, event) ->
 
 $ ->
   # build and wire up
-  bot.setState new RobotTestMachine(new BigCar(bot, 200))
+  bot.setState new RobotTestMachine(new BigCar(bot, 500))
   new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]
 #  new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot
