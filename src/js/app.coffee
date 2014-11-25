@@ -324,7 +324,7 @@ class BigCar
         steering = @steer @code
         @socket.send @code2command steering if steering
         @socket.send @code2command @code
-        #@socket.send @code2command steering if steering
+        @socket.send @code2command steering if steering
         @code -= 1 if @code < 1
     else
       @connectSocket()
@@ -400,7 +400,7 @@ class RobotTestMachine extends ButtonWatcher
     @sequence.addForward = false
 
     # plot a known final destination for debugging
-#    @sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
+    #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
     @limited.addChild new RobotFlaggingState @driver, "storing", "point", ["store"], @sequence
@@ -415,7 +415,11 @@ class RobotTestMachine extends ButtonWatcher
     # shoot a picture
     @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
 
+timer_id = null
 bot = new StateTracker (state, event) ->
+  # this code is run each time the state changes
+  # useful for displaying the current state machine and for debugging
+  # event caused the last state change
   #console.log "pushed state to #{state.name}"
   lastevent = if event
     eventkey = Object.keys(event)[0]
@@ -423,11 +427,13 @@ bot = new StateTracker (state, event) ->
     " #{eventkey}:#{eventval}"
   else
     ""
-  $("#set").html(state.ancestor().accordian(state, lastevent)).collapsibleset("refresh")
+  html = state.ancestor().accordian(state, lastevent)
+  clearTimeout timer_id
+  timer_id = setTimeout ((html) -> $("#set").html(html).collapsibleset("refresh")), 500, html
 
 $ ->
   # build and wire up
-  bot.setState new RobotTestMachine(new BigCar(bot, 500))
+  bot.setState new RobotTestMachine(new BigCar(bot, 200))
   new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]
 #  new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot
