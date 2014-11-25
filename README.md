@@ -26,6 +26,15 @@ More refactoring:
 * gui should display current state and useful information about the machine
 * start/stop sounds to indicate state or as an action available on entering
 
+If you'd like to try this without the car, run this in your console:
+
+nc -l -p 9000
+
+And change "new BigCar(bot, 500)" to "new BigCar(bot, 500, '127.0.0.1')"
+
+Then if you hit the drive button, you should see in your nc output a stream of commands like 
+$89476$?$39476$?$89476$?$39476$?$89476$?.
+
 BSD license
 Copyright 2014 
 Brad Midgley
