@@ -145,6 +145,11 @@ RobotSequentialState = (function(_super) {
     })(this));
   }
 
+  RobotSequentialState.prototype.addChild = function(state) {
+    state.name += " " + (this.behaviors.length + 1);
+    return RobotSequentialState.__super__.addChild.call(this, state);
+  };
+
   return RobotSequentialState;
 
 })(RobotState);
@@ -187,10 +192,8 @@ RobotFlaggingState = (function(_super) {
   function RobotFlaggingState(driver, name, flagname, goals, target) {
     this.target = target;
     RobotFlaggingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
-      var finder;
       if (event.location) {
-        finder = this.target.addChild(new RobotFindingState(driver, flagname, [], event.location.coords));
-        console.log(finder);
+        this.target.addChild(new RobotFindingState(driver, flagname, [], event.location.coords));
         return this.parent;
       }
       return null;
@@ -251,8 +254,6 @@ RobotFindingState = (function(_super) {
     this.location = location;
     this.perimeter = perimeter != null ? perimeter : 1;
     this.compass_variance = compass_variance != null ? compass_variance : 20;
-    console.log("creating a findingstate with location");
-    console.log(this.location);
     RobotFindingState.__super__.constructor.call(this, name, goals, function(currentState, event) {
       var d, declination, newState;
       if (event.location) {
@@ -293,22 +294,18 @@ RobotFindingState = (function(_super) {
     })(this));
     this.left_turning = this.addChild(new RobotState("left", [], (function() {
       return null;
-    }), (function(_this) {
-      return function(oldState, currentState) {
-        if (currentState === _this) {
-          return _this.driver.drive(5);
-        }
+    }), ((function(_this) {
+      return function() {
+        return _this.driver.drive(5);
       };
-    })(this)));
+    })(this))));
     this.right_turning = this.addChild(new RobotState("right", [], (function() {
       return null;
-    }), (function(_this) {
-      return function(oldState, currentState) {
-        if (currentState === _this) {
-          return _this.driver.drive(6);
-        }
+    }), ((function(_this) {
+      return function() {
+        return _this.driver.drive(6);
       };
-    })(this)));
+    })(this))));
   }
 
   RobotFindingState.prototype.toRadians = function(r) {
@@ -328,7 +325,10 @@ RobotFindingState = (function(_super) {
       return 0;
     }
     bearing = this.bearing(this.current_location, this.location);
-    relative = ((360 + this.compass_reading - bearing) % 360) - 180;
+    relative = (360 + this.compass_reading - bearing) % 360;
+    if (relative > 180) {
+      relative -= 360;
+    }
     if (this.debug2) {
       console.log("bearing " + bearing + " from compass " + this.compass_reading + " off by " + relative + ". " + this.current_location.latitude + "," + this.current_location.longitude + " to " + this.location.latitude + "," + this.location.longitude + " " + (this.distance(this.current_location, this.location)) + "m");
       this.debug2 = false;
@@ -456,7 +456,7 @@ LittleCar = (function() {
 
   LittleCar.prototype.drive = function(code, speed) {
     if (speed == null) {
-      speed = 8;
+      speed = 15;
     }
     return $.ajax('http://localhost:8080/' + code + speed.toString(16), {
       type: 'GET',
@@ -548,10 +548,28 @@ BigCar = (function() {
     return "$?";
   };
 
+  BigCar.prototype.steer = function(code) {
+    if (code === 5 || code === 7) {
+      return "3";
+    }
+    if (code === 6 || code === 8) {
+      return "4";
+    }
+    return null;
+  };
+
   BigCar.prototype.nextCode = function() {
+    var steering;
     if (this.socket && this.socket.readyState === "open") {
       if (this.code > -5) {
+        steering = this.steer(this.code);
+        if (steering) {
+          this.socket.send(this.code2command(steering));
+        }
         this.socket.send(this.code2command(this.code));
+        if (steering) {
+          this.socket.send(this.code2command(steering));
+        }
         if (this.code < 1) {
           return this.code -= 1;
         }
@@ -711,17 +729,13 @@ RobotTestMachine = (function(_super) {
         }
       };
     })(this));
-    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 60));
+    this.limited = this.addChild(new RobotTimeLimit("limiting", [], 180));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
     this.sequence.addForward = false;
-    this.sequence.addChild(new RobotFindingState(this.driver, "trailhead", [], {
-      latitude: 40.460304,
-      longitude: -111.797706
-    }));
     this.limited.addChild(new RobotFlaggingState(this.driver, "storing", "point", ["store"], this.sequence));
     this.limited.addChild(new RobotState("driving", ["drive"], null, (function(_this) {
       return function() {
-        return _this.driver.drive(1);
+        return _this.driver.drive(5);
       };
     })(this)));
     this.addChild(new RobotState("resetting", ["reset"], (function(_this) {
@@ -744,9 +758,8 @@ bot = new StateTracker(function(state, event) {
 });
 
 $(function() {
-  bot.setState(new RobotTestMachine(new BigCar(bot, 1000)));
+  bot.setState(new RobotTestMachine(new BigCar(bot, 200)));
   new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]);
-  new CrashAnnouncer("crash", bot);
   new OrientationAnnouncer("orientation", bot);
   new LocationAnnouncer("location", bot);
   return new TimeAnnouncer("time", bot);
