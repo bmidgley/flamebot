@@ -34,7 +34,7 @@ RobotState = (function() {
       }
     }
     if (this.listener) {
-      newState = this.listener(currentState, event);
+      newState = this.listener(currentState, event, this);
       if (newState) {
         return newState;
       }
@@ -47,7 +47,7 @@ RobotState = (function() {
       this.parent.enterAll(oldState, currentState);
     }
     if (this.entering) {
-      return this.entering(oldState, currentState);
+      return this.entering(oldState, currentState, this);
     }
   };
 

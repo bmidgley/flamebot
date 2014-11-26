@@ -17,16 +17,16 @@ class RobotState
   # process an event
   processEvent: (currentState, event) ->
     if @parent
-      newState = @parent.processEvent(currentState, event)
+      newState = @parent.processEvent currentState, event
       return newState if newState
     if @listener
-      newState = @listener(currentState, event)
+      newState = @listener currentState, event, @
       return newState if newState
     null
 
   enterAll: (oldState, currentState) ->
     @parent.enterAll(oldState, currentState) if @parent
-    @entering(oldState, currentState) if @entering
+    @entering(oldState, currentState, @) if @entering
 
   findHandler: (goal) ->
     @ancestor().findHandlerR(goal)
