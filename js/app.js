@@ -268,7 +268,7 @@ RobotFindingState = (function(_super) {
       }
       if (event.orientation) {
         declination = 13;
-        this.compass_reading = (720 - event.orientation.alpha) % 360;
+        this.compass_reading = (360 - event.orientation.alpha) % 360;
         if (this.debug) {
           console.log("true orientation: " + this.compass_reading);
           this.debug = false;

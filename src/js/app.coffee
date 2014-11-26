@@ -151,8 +151,9 @@ class RobotFindingState extends RobotState
       # compass
       if event.orientation
         declination = 13
-        #@compass_reading = (630 - event.orientation.alpha) % 360 # landscape orientation with home button on left
-        @compass_reading = (720 - event.orientation.alpha) % 360 # portrait
+        #@compass_reading = (630 - event.orientation.alpha) % 360 # flame landscape orientation with home button on left
+        @compass_reading = (360 - event.orientation.alpha) % 360 # flame in portrait orientation
+        #@compass_reading = event.orientation.alpha # zte open in portrait orientation
         if @debug
           console.log "true orientation: #{@compass_reading}"
           @debug = false
