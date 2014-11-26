@@ -264,13 +264,11 @@ RobotFindingState = (function(_super) {
         distance = this.distance(this.current_location, this.location);
         if (distance < this.perimeter) {
           return this.parent;
-        } else {
-          console.log("distance " + distance);
         }
       }
       if (event.orientation) {
         declination = 13;
-        this.compass_reading = (630 - event.orientation.alpha) % 360;
+        this.compass_reading = (720 - event.orientation.alpha) % 360;
         if (this.debug) {
           console.log("true orientation: " + this.compass_reading);
           this.debug = false;

@@ -147,13 +147,12 @@ class RobotFindingState extends RobotState
         distance = @distance(@current_location, @location)
         if distance < @perimeter
           return @parent
-        else
-          console.log "distance #{distance}"
 
       # compass
       if event.orientation
         declination = 13
-        @compass_reading = (630 - event.orientation.alpha) % 360
+        #@compass_reading = (630 - event.orientation.alpha) % 360 # landscape orientation with home button on left
+        @compass_reading = (720 - event.orientation.alpha) % 360 # portrait
         if @debug
           console.log "true orientation: #{@compass_reading}"
           @debug = false
