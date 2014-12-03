@@ -259,8 +259,7 @@ class CompassCalibrator extends RobotState
       return unless currentState == @
       @driver.drive 0
       if @location2
-        @calibrated.cancel() if @calibrated
-        @calibrated = new CompassAnnouncer "compass", bot, 0, 0
+        @calibrated = bot.addAnnouncer new CompassAnnouncer "compass", 0, 0
         @complete = true
         @reset()
       @previousState ||= oldState unless @contains(oldState)
@@ -291,6 +290,7 @@ class CompassCalibrator extends RobotState
 # keep track of state
 class StateTracker
   constructor: (@notifier) ->
+    @announcers = {}
 
   # only the state argument is required
   setState: (@state, oldState, event) ->
@@ -302,6 +302,11 @@ class StateTracker
     newState = @state.processEvent(@state, event)
     @setState(newState, @state, event) if newState
 
+  addAnnouncer: (announcer) ->
+    previous = @announcers[announcer.name]
+    previous.cancel() if previous
+    announcer.setBot @
+    @announcers[announcer.name] = announcer
 
 # everyone needs one of these
 class ImaginaryCar
@@ -309,7 +314,7 @@ class ImaginaryCar
 
   drive: (code) ->
     console.log "drive(#{code})"
-    @bot.announce battery: 11
+    @announce battery: 11
 
 
 # LittleCar aka iRacer
@@ -327,7 +332,7 @@ class LittleCar
 
   drive: (code, speed=15) ->
     $.ajax 'http://localhost:8080/' + code + speed.toString(16), type: 'GET', dataType: 'html', success: (data) =>
-      @bot.announce battery: data
+      @announce battery: data
 
 # BigCar aka Brookstone's Wifi Racer
 # BigCar depends on the user to connect the phone to the car's wifi access point
@@ -355,7 +360,7 @@ class BigCar
     @socket.onclose = => @connecting = false
     @socket.ondata = (event) =>
       level = (parseInt(event.data.slice(2), 16) - 2655 ) * 0.20
-      @bot.announce battery: level
+      @announce battery: level
 
   drive: (@code) ->
 
@@ -385,24 +390,30 @@ class BigCar
 
 # Announcers deliver events to a bot
 class Announcer
-  constructor: (@name, @bot) ->
+  constructor: (@name) ->
     @active = true
     console.log "Tracking #{@name} events"
 
+  setBot: (@bot) ->
+
   cancel: ->
     @active = false
+    console.log "canceling one #{@name} announcer"
+
+  announce: (message) ->
+    @bot.announce message if @bot
 
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
-  constructor: (name, bot, buttons) ->
+  constructor: (name, buttons) ->
     super name, bot
     for action in buttons
-      do (action) ->
-        $("##{action}-button").click => @bot.announce button: action
+      do (action) =>
+        $("##{action}-button").click => @announce button: action
 
 # announce a crash if the accelerometer seems to indicate it
 class CrashAnnouncer extends Announcer
-  constructor: (name, bot, @magnitude = 25, @mininterval = 1000000) ->
+  constructor: (name, @magnitude = 25, @mininterval = 1000000) ->
     super name, bot
     @motionTimeStamp = 0
     @motionVector = {x:0, y:0, z:0}
@@ -414,36 +425,36 @@ class CrashAnnouncer extends Announcer
       @motionVector = {x:a.x, y:a.y, z:a.z}
       if v > @magnitude && interval > @mininterval
         console.log "motion event magnitude #{v} after #{interval/@mininterval} intervals"
-        @bot.announce crash: event
+        @announce crash: event
         @motionTimeStamp = event.timeStamp
 
 # announce orentation event.{alpha,beta,gamma} where alpha is compass direction
 class OrientationAnnouncer extends Announcer
-  constructor: (name, bot) ->
+  constructor: (name) ->
     super name, bot
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
-      @bot.announce orientation: event
+      @announce orientation: event
     , true
 
 # announce location.coords.{latitude,longitude}
 class LocationAnnouncer extends Announcer
-  constructor: (name, bot) ->
+  constructor: (name) ->
     super name, bot
-    @watch_id = navigator.geolocation.watchPosition ((location) => @bot.announce location: location), 
+    @watch_id = navigator.geolocation.watchPosition ((location) => @announce location: location), 
       (-> console.log "geolocation error"), enableHighAccuracy: true
 
 # announce time has passed
 class TimeAnnouncer extends Announcer
-  constructor: (name, bot) ->
+  constructor: (name) ->
     super name, bot
-    @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
+    @interval_id = window.setInterval (=> @announce timer: 1), 1000
 
 # announce calibrated compass events
 class CompassAnnouncer extends Announcer
-  constructor: (name, bot, @offset = 0, @factor = 1) ->
+  constructor: (name, @offset = 0, @factor = 1) ->
     super name, bot
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
-      @bot.announce compass: (360 + @offset + @factor * event.alpha) % 360 if @active
+      @announce compass: (360 + @offset + @factor * event.alpha) % 360 if @active
     , true
 
 # build my robot's state machine
@@ -503,9 +514,9 @@ bot = new StateTracker (state, event) ->
 $ ->
   # build and wire up
   bot.setState new RobotTestMachine(new BigCar(bot, 200))
-  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]
-  new CrashAnnouncer "crash", bot
-  new OrientationAnnouncer "orientation", bot
-  new LocationAnnouncer "location", bot
-  new TimeAnnouncer "time", bot
+  bot.addAnnouncer new ButtonAnnouncer "button", ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]
+  bot.addAnnouncer new CrashAnnouncer "crash"
+  bot.addAnnouncer new OrientationAnnouncer "orientation"
+  bot.addAnnouncer new LocationAnnouncer "location"
+  bot.addAnnouncer new TimeAnnouncer "time"
 

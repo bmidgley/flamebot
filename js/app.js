@@ -441,10 +441,7 @@ CompassCalibrator = (function(_super) {
         }
         _this.driver.drive(0);
         if (_this.location2) {
-          if (_this.calibrated) {
-            _this.calibrated.cancel();
-          }
-          _this.calibrated = new CompassAnnouncer("compass", bot, 0, 0);
+          _this.calibrated = bot.addAnnouncer(new CompassAnnouncer("compass", 0, 0));
           _this.complete = true;
           _this.reset();
         }
@@ -499,6 +496,7 @@ CompassCalibrator = (function(_super) {
 StateTracker = (function() {
   function StateTracker(notifier) {
     this.notifier = notifier;
+    this.announcers = {};
   }
 
   StateTracker.prototype.setState = function(state, oldState, event) {
@@ -520,6 +518,16 @@ StateTracker = (function() {
     }
   };
 
+  StateTracker.prototype.addAnnouncer = function(announcer) {
+    var previous;
+    previous = this.announcers[announcer.name];
+    if (previous) {
+      previous.cancel();
+    }
+    announcer.setBot(this);
+    return this.announcers[announcer.name] = announcer;
+  };
+
   return StateTracker;
 
 })();
@@ -531,7 +539,7 @@ ImaginaryCar = (function() {
 
   ImaginaryCar.prototype.drive = function(code) {
     console.log("drive(" + code + ")");
-    return this.bot.announce({
+    return this.announce({
       battery: 11
     });
   };
@@ -561,7 +569,7 @@ LittleCar = (function() {
       dataType: 'html',
       success: (function(_this) {
         return function(data) {
-          return _this.bot.announce({
+          return _this.announce({
             battery: data
           });
         };
@@ -626,7 +634,7 @@ BigCar = (function() {
       return function(event) {
         var level;
         level = (parseInt(event.data.slice(2), 16) - 2655) * 0.20;
-        return _this.bot.announce({
+        return _this.announce({
           battery: level
         });
       };
@@ -683,15 +691,25 @@ BigCar = (function() {
 })();
 
 Announcer = (function() {
-  function Announcer(name, bot) {
+  function Announcer(name) {
     this.name = name;
-    this.bot = bot;
     this.active = true;
     console.log("Tracking " + this.name + " events");
   }
 
+  Announcer.prototype.setBot = function(bot) {
+    this.bot = bot;
+  };
+
   Announcer.prototype.cancel = function() {
-    return this.active = false;
+    this.active = false;
+    return console.log("canceling one " + this.name + " announcer");
+  };
+
+  Announcer.prototype.announce = function(message) {
+    if (this.bot) {
+      return this.bot.announce(message);
+    }
   };
 
   return Announcer;
@@ -701,18 +719,18 @@ Announcer = (function() {
 ButtonAnnouncer = (function(_super) {
   __extends(ButtonAnnouncer, _super);
 
-  function ButtonAnnouncer(name, bot, buttons) {
+  function ButtonAnnouncer(name, buttons) {
     var action, _fn, _i, _len;
     ButtonAnnouncer.__super__.constructor.call(this, name, bot);
-    _fn = function(action) {
-      return $("#" + action + "-button").click((function(_this) {
-        return function() {
-          return _this.bot.announce({
+    _fn = (function(_this) {
+      return function(action) {
+        return $("#" + action + "-button").click(function() {
+          return _this.announce({
             button: action
           });
-        };
-      })(this));
-    };
+        });
+      };
+    })(this);
     for (_i = 0, _len = buttons.length; _i < _len; _i++) {
       action = buttons[_i];
       _fn(action);
@@ -726,7 +744,7 @@ ButtonAnnouncer = (function(_super) {
 CrashAnnouncer = (function(_super) {
   __extends(CrashAnnouncer, _super);
 
-  function CrashAnnouncer(name, bot, magnitude, mininterval) {
+  function CrashAnnouncer(name, magnitude, mininterval) {
     this.magnitude = magnitude != null ? magnitude : 25;
     this.mininterval = mininterval != null ? mininterval : 1000000;
     CrashAnnouncer.__super__.constructor.call(this, name, bot);
@@ -750,7 +768,7 @@ CrashAnnouncer = (function(_super) {
         };
         if (v > _this.magnitude && interval > _this.mininterval) {
           console.log("motion event magnitude " + v + " after " + (interval / _this.mininterval) + " intervals");
-          _this.bot.announce({
+          _this.announce({
             crash: event
           });
           return _this.motionTimeStamp = event.timeStamp;
@@ -766,11 +784,11 @@ CrashAnnouncer = (function(_super) {
 OrientationAnnouncer = (function(_super) {
   __extends(OrientationAnnouncer, _super);
 
-  function OrientationAnnouncer(name, bot) {
+  function OrientationAnnouncer(name) {
     OrientationAnnouncer.__super__.constructor.call(this, name, bot);
     this.orientation_id = window.addEventListener('deviceorientation', (function(_this) {
       return function(event) {
-        return _this.bot.announce({
+        return _this.announce({
           orientation: event
         });
       };
@@ -784,11 +802,11 @@ OrientationAnnouncer = (function(_super) {
 LocationAnnouncer = (function(_super) {
   __extends(LocationAnnouncer, _super);
 
-  function LocationAnnouncer(name, bot) {
+  function LocationAnnouncer(name) {
     LocationAnnouncer.__super__.constructor.call(this, name, bot);
     this.watch_id = navigator.geolocation.watchPosition(((function(_this) {
       return function(location) {
-        return _this.bot.announce({
+        return _this.announce({
           location: location
         });
       };
@@ -806,11 +824,11 @@ LocationAnnouncer = (function(_super) {
 TimeAnnouncer = (function(_super) {
   __extends(TimeAnnouncer, _super);
 
-  function TimeAnnouncer(name, bot) {
+  function TimeAnnouncer(name) {
     TimeAnnouncer.__super__.constructor.call(this, name, bot);
     this.interval_id = window.setInterval(((function(_this) {
       return function() {
-        return _this.bot.announce({
+        return _this.announce({
           timer: 1
         });
       };
@@ -824,14 +842,14 @@ TimeAnnouncer = (function(_super) {
 CompassAnnouncer = (function(_super) {
   __extends(CompassAnnouncer, _super);
 
-  function CompassAnnouncer(name, bot, offset, factor) {
+  function CompassAnnouncer(name, offset, factor) {
     this.offset = offset != null ? offset : 0;
     this.factor = factor != null ? factor : 1;
     CompassAnnouncer.__super__.constructor.call(this, name, bot);
     this.orientation_id = window.addEventListener('deviceorientation', (function(_this) {
       return function(event) {
         if (_this.active) {
-          return _this.bot.announce({
+          return _this.announce({
             compass: (360 + _this.offset + _this.factor * event.alpha) % 360
           });
         }
@@ -892,9 +910,9 @@ bot = new StateTracker(function(state, event) {
 
 $(function() {
   bot.setState(new RobotTestMachine(new BigCar(bot, 200)));
-  new ButtonAnnouncer("button", bot, ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]);
-  new CrashAnnouncer("crash", bot);
-  new OrientationAnnouncer("orientation", bot);
-  new LocationAnnouncer("location", bot);
-  return new TimeAnnouncer("time", bot);
+  bot.addAnnouncer(new ButtonAnnouncer("button", ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]));
+  bot.addAnnouncer(new CrashAnnouncer("crash"));
+  bot.addAnnouncer(new OrientationAnnouncer("orientation"));
+  bot.addAnnouncer(new LocationAnnouncer("location"));
+  return bot.addAnnouncer(new TimeAnnouncer("time"));
 });
