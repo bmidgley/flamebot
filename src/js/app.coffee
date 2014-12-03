@@ -24,9 +24,9 @@ class RobotState
       return newState if newState
     null
 
-  enterAll: (oldState, currentState) ->
-    @parent.enterAll(oldState, currentState) if @parent
-    @entering(oldState, currentState, @) if @entering
+  enterAll: (oldState, currentState, bot) ->
+    @parent.enterAll(oldState, currentState, bot) if @parent
+    @entering(oldState, currentState, @, bot) if @entering
 
   findHandler: (goal) ->
     @ancestor().findHandlerR(goal)
@@ -48,6 +48,21 @@ class RobotState
     for child in @behaviors
       return true if child.contains(target)
     return false
+
+  toRadians: (r) ->
+    r * Math.PI / 180.0
+
+  toDegrees: (d) ->
+    180.0 * d / Math.PI
+
+  bearing: (a, b) ->
+    lat1 = @toRadians(a.latitude)
+    lat2 = @toRadians(b.latitude)
+    lon1 = @toRadians(a.longitude)
+    lon2 = @toRadians(b.longitude)
+    y = Math.sin(lon2 - lon1) * Math.cos(lat2)
+    x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1)
+    @toDegrees Math.atan2(y, x)
 
   accordian: (target, event) ->
     collapsed = if (target != @ && @contains(target)) then "false" else "true"
@@ -89,20 +104,22 @@ class RobotTimeLimit extends RobotState
   constructor: (name, goals, @duration) ->
     @elapsed = 0
     super name, goals, (currentState, event) ->
+      if currentState == @
+        if @contained
+          return @parent
+        else
+          return @behaviors[0] || @parent
       if event.timer
         #console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
         @elapsed += event.timer
         if @elapsed > @duration
           @elapsed = 0
           return @parent
-      if currentState == @
-        console.log "limit's child completed; passing back to parent"
-        return @parent
       null
     , (oldState, currentState) =>
       # if the state was an ancestor before, need to reset the timer
-      unless @contains oldState
-        @elapsed = 0
+      @contained = @contains oldState
+      @elapsed = 0 unless @contained
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
@@ -137,8 +154,8 @@ class RobotPhotographingState extends RobotState
 
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
-  constructor: (@driver, name, goals, @location, @perimeter=1, @compass_variance=20) ->
-    super name, goals, (currentState, event) ->
+  constructor: (@driver, @basename, goals, @location, @perimeter=3, @compass_variance=20) ->
+    super @basename, goals, (currentState, event) ->
       # location
       if event.location
         @current_location = event.location.coords
@@ -194,19 +211,11 @@ class RobotFindingState extends RobotState
     bearing = @bearing @current_location, @location
     relative = ((360 + @compass_reading - bearing) % 360)
     relative -= 360 if relative > 180
+    @name = "#{@basename}#{Math.round(@compass_reading)}/#{Math.round(bearing)}/#{Math.round(relative)} #{Math.round(@distance(@current_location, @location))}m"
     if @debug2
       console.log "bearing #{bearing} from compass #{@compass_reading} off by #{relative}. #{@current_location.latitude},#{@current_location.longitude} to #{@location.latitude},#{@location.longitude} #{@distance(@current_location, @location)}m"
       @debug2 = false
     return relative
-
-  bearing: (a, b) ->
-    lat1 = @toRadians(a.latitude)
-    lat2 = @toRadians(b.latitude)
-    lon1 = @toRadians(a.longitude)
-    lon2 = @toRadians(b.longitude)
-    y = Math.sin(lon2 - lon1) * Math.cos(lat2)
-    x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1)
-    @toDegrees Math.atan2(y, x)
 
   distance: (a, b, r=6371000) ->
     lat1 = @toRadians(a.latitude)
@@ -234,6 +243,50 @@ class ButtonWatcher extends RobotState
       return null
     , entering
 
+# calibrate the compass (orientation events are not consistent between devices)
+# also intercept any state below this one by first calibrating
+class CompassCalibrator extends RobotState
+  constructor: (name, goals, @driver) ->
+    super name, goals, (currentState, event) ->
+      if @complete              # jump back to caller state after calibrating
+        @complete = false
+        temp = @previousState
+        @previousState = null
+        return temp
+      return null if @sequence.contains(currentState)   # continue calibrating
+      return @sequence                                  # start calibrating
+    , (oldState, currentState, calibrator, bot) =>
+      return unless currentState == @
+      @driver.drive 0
+      if @location2
+        @calibrated.cancel() if @calibrated
+        @calibrated = new CompassAnnouncer "compass", bot, 0, 0
+        @complete = true
+        @reset()
+      @previousState ||= oldState unless @contains(oldState)
+
+    @sequence = @addChild new RobotSequentialState "measuring", []
+    (@sequence.addChild new RobotTimeLimit "drivelimiting", [], 4).addChild new RobotState "driving", [],
+      (currentState, event) =>
+        if event.location
+          @location1 ||= event.location
+          @location2 = event.location
+        @readings1.push(event.orientation) if event.orientation
+        null
+      , => @driver.drive 1
+    (@sequence.addChild new RobotTimeLimit "turnlimiting", [], 8).addChild new RobotState "turning", [],
+      (currentState, event) =>
+        @readings2.push(event.orientation) if event.orientation
+        null
+      , => @driver.drive 5
+
+    @reset()
+
+  reset: ->
+    @readings1 = []
+    @readings2 = []
+    @location1 = null
+    @location2 = null
 
 # keep track of state
 class StateTracker
@@ -241,7 +294,7 @@ class StateTracker
 
   # only the state argument is required
   setState: (@state, oldState, event) ->
-    @state.enterAll(oldState, @state)
+    @state.enterAll oldState, @state, @
     @notifier(@state, event) if @notifier
 
   announce: (event) ->
@@ -333,7 +386,11 @@ class BigCar
 # Announcers deliver events to a bot
 class Announcer
   constructor: (@name, @bot) ->
-    console.log "tracking #{@name} events"
+    @active = true
+    console.log "Tracking #{@name} events"
+
+  cancel: ->
+    @active = false
 
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
@@ -381,6 +438,14 @@ class TimeAnnouncer extends Announcer
     super name, bot
     @interval_id = window.setInterval (=> @bot.announce timer: 1), 1000
 
+# announce calibrated compass events
+class CompassAnnouncer extends Announcer
+  constructor: (name, bot, @offset = 0, @factor = 1) ->
+    super name, bot
+    @orientation_id = window.addEventListener 'deviceorientation', (event) =>
+      @bot.announce compass: (360 + @offset + @factor * event.alpha) % 360 if @active
+    , true
+
 # build my robot's state machine
 # todo: low-grade location might be accepted
 # todo: firefox flame phone does not reverse the compass but zte open does--detect and adjust
@@ -403,24 +468,28 @@ class RobotTestMachine extends ButtonWatcher
     #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState @driver, "storing", "point", ["store"], @sequence
+    @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
     @limited.addChild new RobotState "driving", ["drive"], null, => @driver.drive 5
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse
+    # todo: handle the case of tearing down any added announcers
     @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
 
     # shoot a picture
     @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
+
+    # calibrate compass
+    @addChild new CompassCalibrator "calibrating", ["calibrate"], @driver
 
 timer_id = null
 bot = new StateTracker (state, event) ->
   # this code is run each time the state changes
   # useful for displaying the current state machine and for debugging
   # event caused the last state change
-  #console.log "pushed state to #{state.name}"
+  console.log "pushed state to #{state.name}"
   lastevent = if event
     eventkey = Object.keys(event)[0]
     eventval = event[eventkey]
@@ -434,8 +503,8 @@ bot = new StateTracker (state, event) ->
 $ ->
   # build and wire up
   bot.setState new RobotTestMachine(new BigCar(bot, 200))
-  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot"]
-#  new CrashAnnouncer "crash", bot
+  new ButtonAnnouncer "button", bot, ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]
+  new CrashAnnouncer "crash", bot
   new OrientationAnnouncer "orientation", bot
   new LocationAnnouncer "location", bot
   new TimeAnnouncer "time", bot
