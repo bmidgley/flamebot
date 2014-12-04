@@ -522,7 +522,7 @@ StateTracker = (function() {
     var previous;
     previous = this.announcers[announcer.name];
     if (previous) {
-      previous.cancel();
+      previous.setBot(null);
     }
     announcer.setBot(this);
     return this.announcers[announcer.name] = announcer;
@@ -693,7 +693,6 @@ BigCar = (function() {
 Announcer = (function() {
   function Announcer(name) {
     this.name = name;
-    this.active = true;
     console.log("Tracking " + this.name + " events");
   }
 
@@ -701,13 +700,8 @@ Announcer = (function() {
     this.bot = bot;
   };
 
-  Announcer.prototype.cancel = function() {
-    this.active = false;
-    return console.log("canceling one " + this.name + " announcer");
-  };
-
   Announcer.prototype.announce = function(message) {
-    if (this.bot && this.active) {
+    if (this.bot) {
       return this.bot.announce(message);
     }
   };

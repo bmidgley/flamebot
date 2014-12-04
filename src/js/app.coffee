@@ -304,7 +304,7 @@ class StateTracker
 
   addAnnouncer: (announcer) ->
     previous = @announcers[announcer.name]
-    previous.cancel() if previous
+    previous.setBot null if previous
     announcer.setBot @
     @announcers[announcer.name] = announcer
 
@@ -391,17 +391,12 @@ class BigCar
 # Announcers deliver events to a bot
 class Announcer
   constructor: (@name) ->
-    @active = true
     console.log "Tracking #{@name} events"
 
   setBot: (@bot) ->
 
-  cancel: ->
-    @active = false
-    console.log "canceling one #{@name} announcer"
-
   announce: (message) ->
-    @bot.announce message if @bot && @active
+    @bot.announce message if @bot
 
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
