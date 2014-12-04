@@ -401,7 +401,7 @@ class Announcer
     console.log "canceling one #{@name} announcer"
 
   announce: (message) ->
-    @bot.announce message if @bot
+    @bot.announce message if @bot && @active
 
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
@@ -454,7 +454,7 @@ class CompassAnnouncer extends Announcer
   constructor: (name, @offset = 0, @factor = 1) ->
     super name, bot
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
-      @announce compass: (360 + @offset + @factor * event.alpha) % 360 if @active
+      @announce compass: (360 + @offset + @factor * event.alpha) % 360
     , true
 
 # build my robot's state machine

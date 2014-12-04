@@ -707,7 +707,7 @@ Announcer = (function() {
   };
 
   Announcer.prototype.announce = function(message) {
-    if (this.bot) {
+    if (this.bot && this.active) {
       return this.bot.announce(message);
     }
   };
@@ -848,11 +848,9 @@ CompassAnnouncer = (function(_super) {
     CompassAnnouncer.__super__.constructor.call(this, name, bot);
     this.orientation_id = window.addEventListener('deviceorientation', (function(_this) {
       return function(event) {
-        if (_this.active) {
-          return _this.announce({
-            compass: (360 + _this.offset + _this.factor * event.alpha) % 360
-          });
-        }
+        return _this.announce({
+          compass: (360 + _this.offset + _this.factor * event.alpha) % 360
+        });
       };
     })(this), true);
   }
