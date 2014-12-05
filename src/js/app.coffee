@@ -1,17 +1,23 @@
 # robot states use/extend RobotState
 class RobotState
-  constructor: (@name, @goals, @listener, @entering) ->
+  constructor: (@name, @goals) ->
     @behaviors = []
     @parent = null
-    @addForward = true
+
+  # deliver event notifications and accept a resulting state change
+  # events are delivered first to parent states then child states down to the current state
+  # the first listener that returns a state will stop this chain and set the new current state
+  listener: (currentState, event, caller) ->
+    null
+
+  # after a state change, alert all the states in the new stack
+  # to take appropriate actions when entering this or a child state
+  entering: (oldState, currentState, caller, bot) ->
 
   # add a child state
   addChild: (state) ->
     state.parent = @
-    if @addForward
-      @behaviors.push state
-    else
-      @behaviors.unshift state
+    @behaviors.push state
     state
 
   # process an event
@@ -19,14 +25,11 @@ class RobotState
     if @parent
       newState = @parent.processEvent currentState, event
       return newState if newState
-    if @listener
-      newState = @listener currentState, event, @
-      return newState if newState
-    null
+    @listener currentState, event, @
 
   enterAll: (oldState, currentState, bot) ->
     @parent.enterAll(oldState, currentState, bot) if @parent
-    @entering(oldState, currentState, @, bot) if @entering
+    @entering(oldState, currentState, @, bot)
 
   findHandler: (goal) ->
     @ancestor().findHandlerR(goal)
@@ -74,26 +77,27 @@ class RobotState
 
 # loop forever state
 class RobotLoopState extends RobotState
-  constructor: (name, goals) ->
-    super name, goals, (currentState, event) ->
-      # only modify the current state if it is me
-      return null if currentState != @
-      @behaviors[0] || @parent
+  listener: (currentState, event) ->
+    # only modify the current state if it is me
+    return null if currentState != @
+    @behaviors[0] || @parent
 
 # move to each child state in sequence then move to parent state
 class RobotSequentialState extends RobotState
   constructor: (name, goals) ->
+    super name, goals
     @counter = -1
-    super name, goals, (currentState, event) ->
-      # only modify the current state if it is me
-      return null if currentState != @
-      return @behaviors[@counter] || @parent
-    , (oldState, currentState) =>
-      # sequence is initialized/incremented if reached from a descendant
-      # and reset if we entered from elsewhere
-      return unless currentState == @
-      contained = @contains(oldState)
-      @counter = if contained then @counter + 1 else 0
+    
+  listener: (currentState, event) ->
+    # only modify the current state if it is me
+    return null if currentState != @
+    return @behaviors[@counter] || @parent
+    
+  entering: (oldState, currentState) =>
+    # sequence is initialized/incremented if reached from a descendant
+    # and reset if we entered from elsewhere
+    return unless currentState == @
+    @counter = if @contains(oldState) then @counter + 1 else 0
 
   addChild: (state) ->
     state.name += " #{@behaviors.length+1}"
@@ -102,100 +106,111 @@ class RobotSequentialState extends RobotState
 # limit time spent on an activity
 class RobotTimeLimit extends RobotState
   constructor: (name, goals, @duration) ->
+    super name, goals
     @elapsed = 0
-    super name, goals, (currentState, event) ->
-      if currentState == @
-        if @contained
-          return @parent
-        else
-          return @behaviors[0] || @parent
-      if event.timer
-        #console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
-        @elapsed += event.timer
-        if @elapsed > @duration
-          @elapsed = 0
-          return @parent
-      null
-    , (oldState, currentState) =>
-      # if the state was an ancestor before, need to reset the timer
-      @contained = @contains oldState
-      @elapsed = 0 unless @contained
+    
+  listener: (currentState, event) ->
+    if currentState == @
+      if @contained
+        return @parent
+      else
+        return @behaviors[0] || @parent
+    if event.timer
+      #console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
+      @elapsed += event.timer
+      if @elapsed > @duration
+        @elapsed = 0
+        return @parent
+    null
+
+  entering: (oldState, currentState) =>
+    # if the state was an ancestor before, need to reset the timer
+    @contained = @contains oldState
+    @elapsed = 0 unless @contained
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (driver, name, flagname, goals, @target) ->
-    super name, goals, (currentState, event) ->
-      if event.location
-        @target.addChild new RobotFindingState(driver, flagname, [], event.location.coords)
-        return @parent
-      null
+  constructor: (@driver, name, @flagname, goals, @target) ->
+    super name, goals
+    
+  listener: (currentState, event) ->
+    if event.location
+      @target.addChild new RobotFindingState(@driver, @flagname, [], event.location.coords)
+      return @parent
+    null
 
 # shoot a picture and move to parent state
 class RobotPhotographingState extends RobotState
   constructor: (name, goals, @filename) ->
-    super name, goals, (currentState, event) ->
-      @parent
-    , (oldState, currentState) =>
-      return unless currentState == @
-      cname = navigator.mozCameras.getListOfCameras()[0]
-      options = camera: cname
-      console.log "selected Camera: #{cname}"
-      navigator.mozCameras.getCamera options, (camera) =>
-        console.log camera
-        poptions =
-          rotation: 90
-          pictureSize: camera.capabilities.pictureSizes[0]
-          fileFormat: camera.capabilities.fileFormats[0]
-        console.log poptions
-        camera.takePicture poptions, (blob) =>
-          console.log blob
-          navigator.getDeviceStorage('pictures').addNamed(blob, @filename)
-      , (e) -> console.log e
+    super name, goals
+    
+  listener: (currentState, event) ->
+    @parent
+    
+  entering: (oldState, currentState) =>
+    return unless currentState == @
+    cname = navigator.mozCameras.getListOfCameras()[0]
+    options = camera: cname
+    console.log "selected Camera: #{cname}"
+    navigator.mozCameras.getCamera options, (camera) =>
+      console.log camera
+      poptions =
+        rotation: 90
+        pictureSize: camera.capabilities.pictureSizes[0]
+        fileFormat: camera.capabilities.fileFormats[0]
+      console.log poptions
+      camera.takePicture poptions, (blob) =>
+        console.log blob
+        navigator.getDeviceStorage('pictures').addNamed(blob, @filename)
+    , (e) -> console.log e
 
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
   constructor: (@driver, @basename, goals, @location, @perimeter=3, @compass_variance=20) ->
-    super @basename, goals, (currentState, event) ->
-      # location
-      if event.location
-        @current_location = event.location.coords
+    super @basename, goals
+    @left_turning = @addChild new RobotState "left", []
+    @left_turning.entering = => @driver.drive 5
+    @right_turning = @addChild new RobotState "right", []
+    @right_turning.entering = => @driver.drive 6
 
-        # finish if perimeter was broken
-        distance = @distance(@current_location, @location)
-        if distance < @perimeter
-          return @parent
+  listener: (currentState, event) ->
+    # location
+    if event.location
+      @current_location = event.location.coords
 
-      # compass
-      if event.orientation
-        declination = 13
-        #@compass_reading = (630 - event.orientation.alpha) % 360 # flame landscape orientation with home button on left
-        @compass_reading = (360 - event.orientation.alpha) % 360 # flame in portrait orientation
-        #@compass_reading = event.orientation.alpha # zte open in portrait orientation
-        if @debug
-          console.log "true orientation: #{@compass_reading}"
-          @debug = false
+      # finish if perimeter was broken
+      distance = @distance(@current_location, @location)
+      if distance < @perimeter
+        return @parent
 
-      if event.timer
+    # compass
+    if event.orientation
+      declination = 13
+      #@compass_reading = (630 - event.orientation.alpha) % 360 # flame landscape orientation with home button on left
+      @compass_reading = (360 - event.orientation.alpha) % 360 # flame in portrait orientation
+      #@compass_reading = event.orientation.alpha # zte open in portrait orientation
+      if @debug
+        console.log "true orientation: #{@compass_reading}"
         @debug = false
-        @debug2 = false
 
-      newState = @
+    if event.timer
+      @debug = false
+      @debug2 = false
 
-      # compare the direction with our goal direction
-      d = @correction()
-      if d > @compass_variance
-        newState = @left_turning
-      if d < -@compass_variance
-        newState = @right_turning
+    newState = @
 
-      return null if currentState == newState
-      return newState
-    , (oldState, currentState) =>
-      @driver.drive 1 if currentState == @
+    # compare the direction with our goal direction
+    d = @correction()
+    if d > @compass_variance
+      newState = @left_turning
+    if d < -@compass_variance
+      newState = @right_turning
 
-    @left_turning = @addChild new RobotState "left", [], (-> null), (=> @driver.drive 5)
+    return null if currentState == newState
+    return newState
 
-    @right_turning = @addChild new RobotState "right", [], (-> null), (=> @driver.drive 6)
+  entering: (oldState, currentState) =>
+    @driver.drive 1 if currentState == @
 
   toRadians: (r) ->
     r * Math.PI / 180.0
@@ -230,56 +245,59 @@ class RobotFindingState extends RobotState
 # todo: average out the readings
 class RobotBatteryLimit extends RobotState
   constructor: (name, goals, @threshold) ->
-    super name, goals, (currentState, event) ->
-      return @parent if event.battery && event.battery < @threshold
-      return null
+    super name, goals
+    
+  listener: (currentState, event) ->
+    return @parent if event.battery && event.battery < @threshold
+    return null
 
 # base button handler and some debug
 class ButtonWatcher extends RobotState
-  constructor: (name, goals, entering) ->
-    super name, goals, (currentState, event) ->
-      return currentState.findHandler(event.button) if event.button
-      #console.log("battery is now #{event.battery}") if event.battery
-      return null
-    , entering
+  listener: (currentState, event) ->
+    return currentState.findHandler(event.button) if event.button
+    #console.log("battery is now #{event.battery}") if event.battery
+    return null
 
 # calibrate the compass (orientation events are not consistent between devices)
 # also intercept any state below this one by first calibrating
 class CompassCalibrator extends RobotState
   constructor: (name, goals, @driver) ->
-    super name, goals, (currentState, event) ->
-      if @complete              # jump back to caller state after calibrating
-        @complete = false
-        temp = @previousState
-        @previousState = null
-        return temp
-      return null if @sequence.contains(currentState)   # continue calibrating
-      return @sequence                                  # start calibrating
-    , (oldState, currentState, calibrator, bot) =>
-      return unless currentState == @
-      @driver.drive 0
-      if @location2
-        @calibrated = bot.addAnnouncer new CompassAnnouncer "compass", 0, 0
-        @complete = true
-        @reset()
-      @previousState ||= oldState unless @contains(oldState)
-
+    super name, goals
     @sequence = @addChild new RobotSequentialState "measuring", []
-    (@sequence.addChild new RobotTimeLimit "drivelimiting", [], 4).addChild new RobotState "driving", [],
-      (currentState, event) =>
-        if event.location
-          @location1 ||= event.location
-          @location2 = event.location
-        @readings1.push(event.orientation) if event.orientation
-        null
-      , => @driver.drive 1
-    (@sequence.addChild new RobotTimeLimit "turnlimiting", [], 8).addChild new RobotState "turning", [],
-      (currentState, event) =>
-        @readings2.push(event.orientation) if event.orientation
-        null
-      , => @driver.drive 5
-
+    drivelimiting = @sequence.addChild new RobotTimeLimit "drivelimiting", [], 4
+    driving = drivelimiting.addChild new RobotState "driving", []
+    driving.listener = (currentState, event) =>
+      if event.location
+        @location1 ||= event.location
+        @location2 = event.location
+      @readings1.push(event.orientation) if event.orientation
+      null
+    driving.entering = => @driver.drive 1
+    turnlimiting = @sequence.addChild new RobotTimeLimit "turnlimiting", [], 8
+    turning = turnlimiting.addChild new RobotState "turning", []
+    turning.listener = (currentState, event) =>
+      @readings2.push(event.orientation) if event.orientation
+      null
+    turning.entering = => @driver.drive 5
     @reset()
+
+  listener: (currentState, event) ->
+    if @complete              # jump back to caller state after calibrating
+      @complete = false
+      temp = @previousState
+      @previousState = null
+      return temp
+    return null if @sequence.contains(currentState)   # continue calibrating
+    return @sequence                                  # start calibrating
+    
+  entering: (oldState, currentState, calibrator, bot) =>
+    return unless currentState == @
+    @driver.drive 0
+    if @location2
+      @calibrated = bot.addAnnouncer new CompassAnnouncer "compass", 0, 0
+      @complete = true
+      @reset()
+    @previousState ||= oldState unless @contains(oldState)
 
   reset: ->
     @readings1 = []
@@ -459,16 +477,19 @@ class CompassAnnouncer extends Announcer
 # extending buttonwatcher as the toplevel state so that buttons can override anything
 class RobotTestMachine extends ButtonWatcher
   constructor: (@driver) ->
-
     # ready state responds to "stop" goal and when entered it stops the car
-    super "ready", ["stop"], (oldState, currentState) => @driver.drive(0) if currentState == @
+    super "ready", ["stop"]
 
     # activities under limited should be allowed some number of seconds to complete, then aborted
     @limited = @addChild new RobotTimeLimit "limiting", [], 600
 
     # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
-    @sequence.addForward = false
+    # store in reverse order
+    @sequence.addChild = (state) =>
+      state.parent = @sequence
+      @sequence.behaviors.unshift state
+      state
 
     # plot a known final destination for debugging
     #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
@@ -477,18 +498,21 @@ class RobotTestMachine extends ButtonWatcher
     @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
-    @limited.addChild new RobotState "driving", ["drive"], null, => @driver.drive 5
+    driving = @limited.addChild new RobotState "driving", ["drive"]
+    driving.entering = => @driver.drive 5
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse
-    # todo: handle the case of tearing down any added announcers
-    @addChild new RobotState "resetting", ["reset"], => new RobotTestMachine(@driver)
+    resetting = @addChild new RobotState "resetting", ["reset"]
+    resetting.listener = => new RobotTestMachine @driver
 
     # shoot a picture
     @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
 
     # calibrate compass
     @addChild new CompassCalibrator "calibrating", ["calibrate"], @driver
+
+  entering: (oldState, currentState) => @driver.drive(0) if currentState == @
 
 timer_id = null
 bot = new StateTracker (state, event) ->
