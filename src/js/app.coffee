@@ -1,18 +1,18 @@
 # robot states use/extend RobotState
 class RobotState
-  constructor: (@name, @goals) ->
+  constructor: (@name, @goals=[]) ->
     @behaviors = []
     @parent = null
 
   # deliver event notifications and accept a resulting state change
   # events are delivered first to parent states then child states down to the current state
   # the first listener that returns a state will stop this chain and set the new current state
-  listener: (currentState, event, caller) ->
+  listener: (currentState, event) ->
     null
 
   # after a state change, alert all the states in the new stack
   # to take appropriate actions when entering this or a child state
-  entering: (oldState, currentState, caller, bot) ->
+  entering: (oldState, currentState, bot) ->
 
   # add a child state
   addChild: (state) ->
@@ -25,11 +25,11 @@ class RobotState
     if @parent
       newState = @parent.processEvent currentState, event
       return newState if newState
-    @listener currentState, event, @
+    @listener currentState, event
 
   enterAll: (oldState, currentState, bot) ->
     @parent.enterAll(oldState, currentState, bot) if @parent
-    @entering(oldState, currentState, @, bot)
+    @entering(oldState, currentState, bot)
 
   findHandler: (goal) ->
     @ancestor().findHandlerR(goal)
@@ -116,7 +116,6 @@ class RobotTimeLimit extends RobotState
       else
         return @behaviors[0] || @parent
     if event.timer
-      #console.log "comparing elapsed #{@elapsed} with duration #{@duration}"
       @elapsed += event.timer
       if @elapsed > @duration
         @elapsed = 0
@@ -127,6 +126,13 @@ class RobotTimeLimit extends RobotState
     # if the state was an ancestor before, need to reset the timer
     @contained = @contains oldState
     @elapsed = 0 unless @contained
+
+# drive in a specified direction
+class Driving extends RobotState
+  constructor: (name, goals, @driver, @direction) ->
+    super name, goals
+  entering: (oldState, currentState) =>
+    @driver.drive @direction if currentState == @
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
@@ -290,7 +296,7 @@ class CompassCalibrator extends RobotState
     return null if @sequence.contains(currentState)   # continue calibrating
     return @sequence                                  # start calibrating
     
-  entering: (oldState, currentState, calibrator, bot) =>
+  entering: (oldState, currentState, bot) =>
     return unless currentState == @
     @driver.drive 0
     if @location2
@@ -498,8 +504,7 @@ class RobotTestMachine extends ButtonWatcher
     @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"], @sequence
 
     # simply engage the motor, subject to the time limit above
-    driving = @limited.addChild new RobotState "driving", ["drive"]
-    driving.entering = => @driver.drive 5
+    @driving = @limited.addChild new Driving "driving", ["drive"], @driver, 5
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse
