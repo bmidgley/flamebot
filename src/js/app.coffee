@@ -174,10 +174,8 @@ class RobotPhotographingState extends RobotState
 class RobotFindingState extends RobotState
   constructor: (@driver, @basename, goals, @location, @perimeter=3, @compass_variance=20) ->
     super @basename, goals
-    @left_turning = @addChild new RobotState "left", []
-    @left_turning.entering = => @driver.drive 5
-    @right_turning = @addChild new RobotState "right", []
-    @right_turning.entering = => @driver.drive 6
+    @left_turning = @addChild new Driving "left", [], @driver, 5
+    @right_turning = @addChild new Driving "right", [], @driver, 6
 
   listener: (currentState, event) ->
     # location
@@ -190,11 +188,8 @@ class RobotFindingState extends RobotState
         return @parent
 
     # compass
-    if event.orientation
-      declination = 13
-      #@compass_reading = (630 - event.orientation.alpha) % 360 # flame landscape orientation with home button on left
-      @compass_reading = (360 - event.orientation.alpha) % 360 # flame in portrait orientation
-      #@compass_reading = event.orientation.alpha # zte open in portrait orientation
+    if event.compass
+      @compass_reading = event.compass
       if @debug
         console.log "true orientation: #{@compass_reading}"
         @debug = false
@@ -264,46 +259,68 @@ class ButtonWatcher extends RobotState
     #console.log("battery is now #{event.battery}") if event.battery
     return null
 
+# indicate the compass heading
+class CompassDisplay extends RobotState
+  constructor: (name, goals) ->
+    super name, goals
+    @directions = [
+      @addChild new RobotState "north"
+      @addChild new RobotState "east"
+      @addChild new RobotState "south"
+      @addChild new RobotState "west"
+      ]
+
+  listener: (currentState, event) =>
+    if event.compass
+      idx = Math.floor((event.compass + 45)/90)
+      direction = @directions[idx]
+      return direction if currentState != direction
+    null
+
 # calibrate the compass (orientation events are not consistent between devices)
 # also intercept any state below this one by first calibrating
-class CompassCalibrator extends RobotState
+class CompassCalibrator extends RobotSequentialState
   constructor: (name, goals, @driver) ->
     super name, goals
-    @sequence = @addChild new RobotSequentialState "measuring", []
-    drivelimiting = @sequence.addChild new RobotTimeLimit "drivelimiting", [], 4
-    driving = drivelimiting.addChild new RobotState "driving", []
-    driving.listener = (currentState, event) =>
-      if event.location
-        @location1 ||= event.location
-        @location2 = event.location
-      @readings1.push(event.orientation) if event.orientation
-      null
-    driving.entering = => @driver.drive 1
-    turnlimiting = @sequence.addChild new RobotTimeLimit "turnlimiting", [], 8
-    turning = turnlimiting.addChild new RobotState "turning", []
-    turning.listener = (currentState, event) =>
-      @readings2.push(event.orientation) if event.orientation
-      null
-    turning.entering = => @driver.drive 5
+    @pathing = (@addChild new RobotTimeLimit "pathlimiting", [], 2).addChild new Driving "pathing", [], @driver, 1
+    @turning = (@addChild new RobotTimeLimit "turnlimiting", [], 8).addChild new Driving "rightturning", [], @driver, 6
+    @registering = @addChild new RobotState "registering"
     @reset()
 
-  listener: (currentState, event) ->
-    if @complete              # jump back to caller state after calibrating
-      @complete = false
-      temp = @previousState
-      @previousState = null
-      return temp
-    return null if @sequence.contains(currentState)   # continue calibrating
-    return @sequence                                  # start calibrating
-    
-  entering: (oldState, currentState, bot) =>
-    return unless currentState == @
-    @driver.drive 0
-    if @location2
-      @calibrated = bot.addAnnouncer new CompassAnnouncer "compass", 0, 0
-      @complete = true
+  listener: (currentState, event) =>
+    switch currentState
+      when @pathing
+        if event.location
+          @location1 ||= event.location
+          @location2 = event.location
+        else if event.orientation
+          @readings1.push(event.orientation)
+      when @turning
+        if event.orientation
+          @readings2.push(event.orientation)
+      when @registering
+        return @
+    super currentState, event
+
+  entering: (oldState, currentState, bot) ->
+    super oldState, currentState, bot
+    if currentState == @registering
+      @driver.drive 0
+      # register the new calibrated announcer
+
+      # normal/forward readings should have big drops as we turn clockwise pass north
+      deltas = @readings2.map (v, i, a) -> v - a[(i||1)-1]
+      normal_indicators = (deltas.filter (n) -> n < 300).length
+      backward_indicators = (deltas.filter (n) -> n > 300).length
+      factor = if normal_indicators > backward_indicators then 1 else -1
+
+      # then see if there is an offset
+      #bearing = @bearing @location1, @location2
+      #reading = @average_heading @readings1
+      offset = 0
+
+      bot.addAnnouncer new CompassAnnouncer "compass", offset, factor
       @reset()
-    @previousState ||= oldState unless @contains(oldState)
 
   reset: ->
     @readings1 = []
@@ -473,7 +490,8 @@ class CompassAnnouncer extends Announcer
   constructor: (name, @offset = 0, @factor = 1) ->
     super name, bot
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
-      @announce compass: (360 + @offset + @factor * event.alpha) % 360
+      adjusted = Math.floor((360 + @offset + @factor * event.alpha) % 360)
+      @announce compass: adjusted
     , true
 
 # build my robot's state machine
@@ -508,8 +526,7 @@ class RobotTestMachine extends ButtonWatcher
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse
-    resetting = @addChild new RobotState "resetting", ["reset"]
-    resetting.listener = => new RobotTestMachine @driver
+    @resetting = @addChild new RobotState "resetting", ["reset"]
 
     # shoot a picture
     @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
@@ -517,7 +534,18 @@ class RobotTestMachine extends ButtonWatcher
     # calibrate compass
     @addChild new CompassCalibrator "calibrating", ["calibrate"], @driver
 
-  entering: (oldState, currentState) => @driver.drive(0) if currentState == @
+    # display compass
+    @addChild new CompassDisplay "compass", ["compass"]
+
+  listener: (currentState, event) =>
+    if currentState == @resetting
+      return new RobotTestMachine @driver
+    else
+      return super currentState, event
+
+  entering: (oldState, currentState) =>
+    if currentState == @
+      @driver.drive 0
 
 timer_id = null
 bot = new StateTracker (state, event) ->
@@ -533,12 +561,12 @@ bot = new StateTracker (state, event) ->
     ""
   html = state.ancestor().accordian(state, lastevent)
   clearTimeout timer_id
-  timer_id = setTimeout ((html) -> $("#set").html(html).collapsibleset("refresh")), 500, html
+  timer_id = setTimeout ((html) -> $("#set").html(html).collapsibleset("refresh")), 1000, html
 
 $ ->
   # build and wire up
   bot.setState new RobotTestMachine(new BigCar(bot, 200))
-  bot.addAnnouncer new ButtonAnnouncer "button", ["go", "stop", "store", "reset", "drive", "shoot", "calibrate"]
+  bot.addAnnouncer new ButtonAnnouncer "button", ["go", "stop", "store", "reset", "drive", "shoot", "calibrate", "compass"]
   bot.addAnnouncer new CrashAnnouncer "crash"
   bot.addAnnouncer new OrientationAnnouncer "orientation"
   bot.addAnnouncer new LocationAnnouncer "location"
