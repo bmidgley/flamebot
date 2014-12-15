@@ -10,7 +10,7 @@ You need to run a coffeescript compiler if you're going to edit the code: coffee
 
 I presented this in a talk: https://plus.google.com/events/cv4v1h4g1edp0j9abht62ma2bfg
 
-Add events:
+Add:
 
 * send events via web app (wifi racer blocks internet access, so possibly add a server to the car's wan)
 * accelerometer for rising, falling, terrain info
@@ -18,6 +18,8 @@ Add events:
 * read QR codes with camera to detect position
 * image processing to estimate speed, terrain, find targets
 * IR channel for special targets that are IR bright
+* repeat-n-times state
+* more states for the toolbox
 
 More refactoring:
 
