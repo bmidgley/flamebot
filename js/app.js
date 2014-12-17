@@ -21,9 +21,9 @@ RobotTestMachine = (function(_super) {
         return state;
       };
     })(this);
-    this.limited.addChild(new RobotFlaggingState(this.driver, "storing", "p", ["store"], (function(_this) {
-      return function(driver, flagname, goals, coords) {
-        return _this.sequence.addChild(new RobotFindingState(driver, flagname, goals, coords));
+    this.limited.addChild(new RobotFlaggingState("storing", ["store"], (function(_this) {
+      return function(coords) {
+        return _this.sequence.addChild(new RobotFindingState(_this.driver, "p", [], coords));
       };
     })(this)));
     this.driving = this.limited.addChild(new Driving("driving", ["drive"], this.driver, 5));

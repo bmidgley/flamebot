@@ -7,7 +7,7 @@ class RobotState
   # deliver event notifications and accept a resulting state change
   # events are delivered first to parent states then child states down to the current state
   # the first listener that returns a state will stop this chain and set the new current state
-  listener: (currentState, event) ->
+  listener: (currentState, event, bot) ->
     null
 
   # after a state change, alert all the states in the new stack
@@ -21,11 +21,11 @@ class RobotState
     state
 
   # process an event
-  processEvent: (currentState, event) ->
+  processEvent: (currentState, event, bot) ->
     if @parent
-      newState = @parent.processEvent currentState, event
+      newState = @parent.processEvent currentState, event, bot
       return newState if newState
-    @listener currentState, event
+    @listener currentState, event, bot
 
   enterAll: (oldState, currentState, bot) ->
     @parent.enterAll(oldState, currentState, bot) if @parent
@@ -82,6 +82,20 @@ class RobotLoopState extends RobotState
     return null if currentState != @
     @behaviors[0] || @parent
 
+# loop n times state
+class RobotCountState extends RobotState
+  constructor: (name, goals, @limit) ->
+    super name, goals
+
+  listener: (currentState, event) ->
+    return null unless currentState == @
+    return @behaviors[0] if @counter < @limit
+    return @parent
+
+  entering: (oldState, currentState) =>
+    return unless currentState == @
+    @counter = if @contains(oldState) then @counter + 1 else 0
+
 # move to each child state in sequence then move to parent state
 class RobotSequentialState extends RobotState
   constructor: (name, goals) ->
@@ -136,12 +150,12 @@ class Driving extends RobotState
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (@driver, name, @flagname, goals, @flagfactory) ->
+  constructor: (name, goals, @flagfactory) ->
     super name, goals
     
   listener: (currentState, event) =>
     if event.location
-      @flagfactory @driver, @flagname, [], event.location.coords
+      @flagfactory event.location.coords
       return @parent
     null
 
@@ -340,7 +354,7 @@ class StateTracker
 
   announce: (event) ->
     return unless @state
-    newState = @state.processEvent(@state, event)
+    newState = @state.processEvent @state, event, @
     @setState(newState, @state, event) if newState
 
   addAnnouncer: (announcer) ->

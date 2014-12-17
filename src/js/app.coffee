@@ -1,6 +1,4 @@
 # build my robot's state machine
-# todo: low-grade location might be accepted
-# todo: firefox flame phone does not reverse the compass but zte open does--detect and adjust
 
 # extending buttonwatcher as the toplevel state so that buttons can override anything
 class RobotTestMachine extends ButtonWatcher
@@ -23,8 +21,8 @@ class RobotTestMachine extends ButtonWatcher
     #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"],
-      (driver, flagname, goals, coords) => @sequence.addChild new RobotFindingState(driver, flagname, goals, coords)
+    @limited.addChild new RobotFlaggingState "storing", ["store"],
+      (coords) => @sequence.addChild new RobotFindingState @driver, "p", [], coords
 
     # simply engage the motor, subject to the time limit above
     @driving = @limited.addChild new Driving "driving", ["drive"], @driver, 5
