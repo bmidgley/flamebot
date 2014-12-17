@@ -23,7 +23,8 @@ class RobotTestMachine extends ButtonWatcher
     #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"], @sequence
+    @limited.addChild new RobotFlaggingState @driver, "storing", "p", ["store"],
+      (driver, flagname, goals, coords) => @sequence.addChild new RobotFindingState(driver, flagname, goals, coords)
 
     # simply engage the motor, subject to the time limit above
     @driving = @limited.addChild new Driving "driving", ["drive"], @driver, 5

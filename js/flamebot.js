@@ -233,16 +233,17 @@ Driving = (function(_super) {
 RobotFlaggingState = (function(_super) {
   __extends(RobotFlaggingState, _super);
 
-  function RobotFlaggingState(driver, name, flagname, goals, target) {
+  function RobotFlaggingState(driver, name, flagname, goals, flagfactory) {
     this.driver = driver;
     this.flagname = flagname;
-    this.target = target;
+    this.flagfactory = flagfactory;
+    this.listener = __bind(this.listener, this);
     RobotFlaggingState.__super__.constructor.call(this, name, goals);
   }
 
   RobotFlaggingState.prototype.listener = function(currentState, event) {
     if (event.location) {
-      this.target.addChild(new RobotFindingState(this.driver, this.flagname, [], event.location.coords));
+      this.flagfactory(this.driver, this.flagname, [], event.location.coords);
       return this.parent;
     }
     return null;

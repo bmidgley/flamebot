@@ -136,12 +136,12 @@ class Driving extends RobotState
 
 # drop a flag at the current location as a finding state and child of x
 class RobotFlaggingState extends RobotState
-  constructor: (@driver, name, @flagname, goals, @target) ->
+  constructor: (@driver, name, @flagname, goals, @flagfactory) ->
     super name, goals
     
-  listener: (currentState, event) ->
+  listener: (currentState, event) =>
     if event.location
-      @target.addChild new RobotFindingState(@driver, @flagname, [], event.location.coords)
+      @flagfactory @driver, @flagname, [], event.location.coords
       return @parent
     null
 
