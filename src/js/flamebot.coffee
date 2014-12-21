@@ -363,13 +363,16 @@ class StateTracker
     announcer.setBot @
     @announcers[announcer.name] = announcer
 
-# everyone needs one of these
-class ImaginaryCar
+
+class Car
   constructor: (@bot) ->
 
   drive: (code) ->
     console.log "drive(#{code})"
     @announce battery: 11
+    
+  announce: (msg) ->
+    @bot.announce msg
 
 
 # LittleCar aka iRacer
@@ -381,7 +384,7 @@ class ImaginaryCar
 #  echo -e -n "\x${request:5:2}"
 #done >/dev/rfcomm0
 
-class LittleCar
+class LittleCar extends Car
   constructor: (@bot) ->
     $.ajaxSetup xhr: -> new window.XMLHttpRequest mozSystem: true
 
@@ -392,7 +395,7 @@ class LittleCar
 # BigCar aka Brookstone's Wifi Racer
 # BigCar depends on the user to connect the phone to the car's wifi access point
 
-class BigCar
+class BigCar extends Car
   constructor: (@bot, @pace=250, @address="192.168.2.3", @port=9000) ->
     @connecting = false
     @connectSocket()
