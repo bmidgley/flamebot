@@ -27,6 +27,12 @@ class RobotState
       return newState if newState
     @listener currentState, event, bot
 
+  # find the most specific behavior that responds to a message
+  responseTo: (property, args=[]) ->
+    return @[property](args...) if @[property]
+    return @parent.responseTo(property, args) if @parent
+    return null
+
   enterAll: (oldState, currentState, bot) ->
     @parent.enterAll(oldState, currentState, bot) if @parent
     @entering(oldState, currentState, bot)
@@ -74,6 +80,9 @@ class RobotState
       x += child.accordian(target, event)
     x += '</div>'
     return x
+
+  fullName: ->
+    if @parent then "#{@parent.fullName()}/#{@name}" else @name
 
 # loop forever state
 class RobotLoopState extends RobotState
@@ -184,12 +193,32 @@ class RobotPhotographingState extends RobotState
         navigator.getDeviceStorage('pictures').addNamed(blob, @filename)
     , (e) -> console.log e
 
+# basic steering strategy
+class Steering extends Driving
+  constructor: (driver) ->
+    super "steering", [], driver, 1
+    @left_turning = @addChild new Driving "left", [], driver, 5
+    @right_turning = @addChild new Driving "right", [], driver, 6
+
+  listener: (currentState, event) ->
+    # compare the direction with our goal direction
+    d = event.correction
+    return null unless d
+
+    newState = if d > @compass_variance
+      @left_turning
+    else if d < -@compass_variance
+      @right_turning
+    else
+      @
+
+    return if currentState == newState then null else newState
+
 # go to the location specified and then move to parent state
 class RobotFindingState extends RobotState
-  constructor: (@driver, @basename, goals, @location, @perimeter=3, @compass_variance=20) ->
+  constructor: (@basename, goals, strategy, @location, @perimeter=3, @compass_variance=20) ->
     super @basename, goals
-    @left_turning = @addChild new Driving "left", [], @driver, 5
-    @right_turning = @addChild new Driving "right", [], @driver, 6
+    @addChild strategy if strategy
 
   listener: (currentState, event) ->
     # location
@@ -204,28 +233,9 @@ class RobotFindingState extends RobotState
     # compass
     if event.compass
       @compass_reading = event.compass
-      if @debug
-        console.log "true orientation: #{@compass_reading}"
-        @debug = false
 
-    if event.timer
-      @debug = false
-      @debug2 = false
-
-    newState = @
-
-    # compare the direction with our goal direction
-    d = @correction()
-    if d > @compass_variance
-      newState = @left_turning
-    if d < -@compass_variance
-      newState = @right_turning
-
-    return null if currentState == newState
-    return newState
-
-  entering: (oldState, currentState) =>
-    @driver.drive 1 if currentState == @
+    # activate the strategy
+    return if currentState == @ then @behaviors[0] else null
 
   toRadians: (r) ->
     r * Math.PI / 180.0
@@ -234,18 +244,14 @@ class RobotFindingState extends RobotState
     180.0 * d / Math.PI
 
   correction: ->
-    # return signed degree measurement needed to course correct
-    # return 0 if we don't know which way we need to turn
-    return 0 unless @compass_reading
-    return 0 unless @current_location
+    # return event with signed degree measurement needed to course correct
+    # return empty object if we don't know which way we need to turn
+    return {} unless @compass_reading && @current_location
     bearing = @bearing @current_location, @location
     relative = ((360 + @compass_reading - bearing) % 360)
     relative -= 360 if relative > 180
     @name = "#{@basename}#{Math.round(@compass_reading)}/#{Math.round(bearing)}/#{Math.round(relative)} #{Math.round(@distance(@current_location, @location))}m"
-    if @debug2
-      console.log "bearing #{bearing} from compass #{@compass_reading} off by #{relative}. #{@current_location.latitude},#{@current_location.longitude} to #{@location.latitude},#{@location.longitude} #{@distance(@current_location, @location)}m"
-      @debug2 = false
-    return relative
+    return correction: relative
 
   distance: (a, b, r=6371000) ->
     lat1 = @toRadians(a.latitude)
@@ -266,11 +272,10 @@ class RobotBatteryLimit extends RobotState
     return @parent if event.battery && event.battery < @threshold
     return null
 
-# base button handler and some debug
+# base button handler
 class ButtonWatcher extends RobotState
   listener: (currentState, event) ->
     return currentState.findHandler(event.button) if event.button
-    #console.log("battery is now #{event.battery}") if event.battery
     return null
 
 # indicate the compass heading
@@ -456,10 +461,14 @@ class Announcer
   announce: (message) ->
     @bot.announce message if @bot
 
+  announceResponse: (property, args=[]) ->
+    if @bot && @bot.currentState
+      @announce @bot.currentState.responseTo property, args
+
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
   constructor: (name, buttons) ->
-    super name, bot
+    super name
     for action in buttons
       do (action) =>
         $("##{action}-button").click => @announce button: action
@@ -467,7 +476,7 @@ class ButtonAnnouncer extends Announcer
 # announce a crash if the accelerometer seems to indicate it
 class CrashAnnouncer extends Announcer
   constructor: (name, @magnitude = 25, @mininterval = 1000000) ->
-    super name, bot
+    super name
     @motionTimeStamp = 0
     @motionVector = {x:0, y:0, z:0}
     @crash_id = window.addEventListener 'devicemotion', (event) =>
@@ -484,28 +493,34 @@ class CrashAnnouncer extends Announcer
 # announce orentation event.{alpha,beta,gamma} where alpha is compass direction
 class OrientationAnnouncer extends Announcer
   constructor: (name) ->
-    super name, bot
+    super name
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
       @announce orientation: event
     , true
 
+# announce course corrections
+class CorrectionAnnouncer extends Announcer
+  constructor: (name) ->
+    super name
+    @interval_id = window.setInterval (=> @announceResponse "correction"), 1000
+
 # announce location.coords.{latitude,longitude}
 class LocationAnnouncer extends Announcer
   constructor: (name) ->
-    super name, bot
+    super name
     @watch_id = navigator.geolocation.watchPosition ((location) => @announce location: location), 
       (-> console.log "geolocation error"), enableHighAccuracy: true
 
 # announce time has passed
 class TimeAnnouncer extends Announcer
   constructor: (name) ->
-    super name, bot
+    super name
     @interval_id = window.setInterval (=> @announce timer: 1), 1000
 
 # announce calibrated compass events
 class CompassAnnouncer extends Announcer
   constructor: (name, @offset = 0, @factor = 1) ->
-    super name, bot
+    super name
     @orientation_id = window.addEventListener 'deviceorientation', (event) =>
       adjusted = Math.floor((360 + @offset + @factor * event.alpha) % 360)
       @announce compass: adjusted

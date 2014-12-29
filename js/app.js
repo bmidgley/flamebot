@@ -14,16 +14,9 @@ RobotTestMachine = (function(_super) {
     RobotTestMachine.__super__.constructor.call(this, "ready", ["stop"]);
     this.limited = this.addChild(new RobotTimeLimit("limiting", [], 600));
     this.sequence = this.limited.addChild(new RobotSequentialState("stepping", ["go"]));
-    this.sequence.addChild = (function(_this) {
-      return function(state) {
-        state.parent = _this.sequence;
-        _this.sequence.behaviors.unshift(state);
-        return state;
-      };
-    })(this);
     this.limited.addChild(new RobotFlaggingState("storing", ["store"], (function(_this) {
       return function(coords) {
-        return _this.sequence.addChild(new RobotFindingState(_this.driver, "p", [], coords));
+        return _this.sequence.addChild(new RobotFindingState("p", [], new Steering(_this.driver), coords));
       };
     })(this)));
     this.driving = this.limited.addChild(new Driving("driving", ["drive"], this.driver, 5));
@@ -55,7 +48,7 @@ timer_id = null;
 
 bot = new StateTracker(function(state, event) {
   var eventkey, eventval, html, lastevent;
-  console.log("pushed state to " + state.name);
+  console.log("now " + (state.fullName()));
   lastevent = event ? (eventkey = Object.keys(event)[0], eventval = event[eventkey], " " + eventkey + ":" + eventval) : "";
   html = state.ancestor().accordian(state, lastevent);
   clearTimeout(timer_id);

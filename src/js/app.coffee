@@ -11,18 +11,13 @@ class RobotTestMachine extends ButtonWatcher
 
     # this state will collect the flags we put down and it's where we start when the user hits go
     @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
-    # store in reverse order
-    @sequence.addChild = (state) =>
-      state.parent = @sequence
-      @sequence.behaviors.unshift state
-      state
 
     # plot a known final destination for debugging
-    #@sequence.addChild new RobotFindingState(@driver, "trailhead", [], latitude: 40.460304, longitude: -111.797706)
+    #@sequence.addChild new RobotFindingState "trailhead", [], new Steering(@driver), latitude: 40.460304, longitude: -111.797706
 
     # hitting the store button goes here and drops a flag under the sequence state
     @limited.addChild new RobotFlaggingState "storing", ["store"],
-      (coords) => @sequence.addChild new RobotFindingState @driver, "p", [], coords
+      (coords) => @sequence.addChild new RobotFindingState "p", [], new Steering(@driver), coords
 
     # simply engage the motor, subject to the time limit above
     @driving = @limited.addChild new Driving "driving", ["drive"], @driver, 5
@@ -55,7 +50,7 @@ bot = new StateTracker (state, event) ->
   # this code is run each time the state changes
   # useful for displaying the current state machine and for debugging
   # event caused the last state change
-  console.log "pushed state to #{state.name}"
+  console.log "now #{state.fullName()}"
   lastevent = if event
     eventkey = Object.keys(event)[0]
     eventval = event[eventkey]
