@@ -1,7 +1,8 @@
 A cellphone is perfect for driving a robot--it has lots of sensors, wireless adapters, etc.
 
 Flamebot is a first whack at a coffeescript framework that can be used to build a dynamic
-state machine to drive a robot. 
+state machine to drive a robot. It's written as a FirefoxOS application that can run in the
+simulator or you can use Firefox to load it onto a firefoxOS phone.
 
 It should soon be ready for a refactor as we're still experimenting to see what patterns 
 work when writing for it.
@@ -22,11 +23,9 @@ Add:
 * start/stop sounds to indicate state or as an action available on entering
 * write a state machine factory that uses user input and can produce a usable state machine
 
-If you'd like to try this without the car, in the firefox simulator
+If you'd like to try this without the car, in the firefox simulator, change "new BigCar(bot, 500)" to "new Car(bot)"
 
-Change "new BigCar(bot, 500)" to "new Car(bot)"
-
-Then if you hit the drive button, you should see in your debug console a stream of commands like 
+Then if you hit the stop or drive button, you should see in your debug console a stream of commands like 
 drive(0), drive(1), etc.
 
 BSD license
