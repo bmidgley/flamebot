@@ -8,7 +8,7 @@ work when writing for it.
 
 You need to run a coffeescript compiler if you're going to edit the code: coffee -bcw --output . src/
 
-I presented this in a talk: https://plus.google.com/events/cv4v1h4g1edp0j9abht62ma2bfg
+I presented an early version in a talk: https://plus.google.com/events/cv4v1h4g1edp0j9abht62ma2bfg
 
 Add:
 
@@ -18,25 +18,19 @@ Add:
 * read QR codes with camera to detect position
 * image processing to estimate speed, terrain, find targets
 * IR channel for special targets that are IR bright
-* repeat-n-times state
-* more states for the toolbox
-
-More refactoring:
-
-* simplify goals handling -- one item not array, use the state name, move out of core framework, etc
-* work again on prototype gui, somehow link to the active state machine
-* gui should display current state and useful information about the machine
+* more robo states for the toolbox
 * start/stop sounds to indicate state or as an action available on entering
+* write a state machine factory that uses user input and can produce a usable state machine
 
-If you'd like to try this without the car, run this in your console:
+If you'd like to try this without the car, in the firefox simulator
 
-nc -l -p 9000
+Change "new BigCar(bot, 500)" to "new Car(bot)"
 
-And change "new BigCar(bot, 500)" to "new BigCar(bot, 500, '127.0.0.1')"
-
-Then if you hit the drive button, you should see in your nc output a stream of commands like 
-$89476$?$39476$?$89476$?$39476$?$89476$?.
+Then if you hit the drive button, you should see in your debug console a stream of commands like 
+drive(0), drive(1), etc.
 
 BSD license
-Copyright 2014 
+
+Copyright 2014, 2015 
+
 Brad Midgley

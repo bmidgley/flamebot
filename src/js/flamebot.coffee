@@ -322,7 +322,6 @@ class RoboCompassDisplaying extends RoboDoing
     null
 
 # calibrate the compass (orientation events are not consistent between devices)
-# also intercept any state below this one by first calibrating
 class RoboCompassCalibrating extends RoboSequencing
   constructor: (name, goals, @driver) ->
     super name, goals
@@ -352,7 +351,7 @@ class RoboCompassCalibrating extends RoboSequencing
       @driver.drive 0
       # register the new calibrated announcer
 
-      # normal/forward readings should have big drops as we turn clockwise pass north
+      # normal/forward readings should have big drops as we turned clockwise passing north
       deltas = @readings2.map (v, i, a) -> v - a[(i||1)-1]
       normal_indicators = (deltas.filter (n) -> n < 300).length
       backward_indicators = (deltas.filter (n) -> n > 300).length
