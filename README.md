@@ -6,7 +6,7 @@ simulator or you can use Firefox to load it onto a FirefoxOS phone.
 
 The sample app included here presents a user interface that lets you drop virtual flags,
 calibrate the compass, follow the virtual flag path, shoot a picture. Provided you have
-a FirefoxOS phone and the brookstone wifi racer you'll be in business. You see the current
+a FirefoxOS phone and the brookstone wifi racer you'll be in business. You see the
 state machine expanded to highlight the current state when it's running. You can also expand
 and collapse the hierarchy to see the other states.
 
