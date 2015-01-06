@@ -25,8 +25,7 @@ Add:
 * start/stop sounds to indicate state or as an action available on entering
 * write a state machine factory that uses user input and can produce a usable state machine
 
-If you'd like to try this without the car, in the firefox simulator, change "new BigCar(bot, 500)" to "new Car(bot)"
-
+If you'd like to try this without the car, in the Firefox simulator, change "new BigCar(bot, 500)" to "new Car(bot)".
 Then if you hit the stop or drive button, you should see in your debug console a stream of commands like 
 drive(0), drive(1), etc.
 
