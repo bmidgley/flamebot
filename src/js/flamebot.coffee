@@ -1,5 +1,5 @@
-# robot states use/extend RobotState
-class RobotState
+# robot states use/extend RoboDoing
+class RoboDoing
   constructor: (@name, @goals=[]) ->
     @behaviors = []
     @parent = null
@@ -85,14 +85,14 @@ class RobotState
     if @parent then "#{@parent.fullName()}/#{@name}" else @name
 
 # loop forever state
-class RobotLoopState extends RobotState
+class RoboLooping extends RoboDoing
   listener: (currentState, event) ->
     # only modify the current state if it is me
     return null if currentState != @
     @behaviors[0] || @parent
 
 # loop n times state
-class RobotCountState extends RobotState
+class RoboCounting extends RoboDoing
   constructor: (name, goals, @limit) ->
     super name, goals
 
@@ -106,7 +106,7 @@ class RobotCountState extends RobotState
     @counter = if @contains(oldState) then @counter + 1 else 0
 
 # move to each child state in sequence then move to parent state
-class RobotSequentialState extends RobotState
+class RoboSequencing extends RoboDoing
   constructor: (name, goals) ->
     super name, goals
     @counter = -1
@@ -127,7 +127,7 @@ class RobotSequentialState extends RobotState
     super state
 
 # limit time spent on an activity
-class RobotTimeLimit extends RobotState
+class RoboTiming extends RoboDoing
   constructor: (name, goals, @duration) ->
     super name, goals
     @elapsed = 0
@@ -150,15 +150,40 @@ class RobotTimeLimit extends RobotState
     @contained = @contains oldState
     @elapsed = 0 unless @contained
 
+# interrupt something but then return after the interrupt activity finishes
+# activity must be a child so we get notified when it's entered
+# interrupt must be a child so we get an enter message when it finishes
+class RoboInterrupting extends RoboDoing
+  constructor: (name, goals, @activity, @interrupt, @interruptWhen) ->
+    super name, goals
+    @addChild @activity
+    @addChild @interrupt
+    @next = []
+    @prev = []
+
+  listener: ->
+    @next.pop()
+
+  entering: (oldState, currentState, bot) ->
+    if currentState == @
+      @next = if @activity.contains oldState
+        [@parent]
+      else
+        [@prev.pop() || @activity]
+    else
+      if @activity.contains(currentState) && @interruptWhen(bot)
+        @next = [@interrupt]
+        @prev = [currentState]
+
 # drive in a specified direction
-class Driving extends RobotState
+class RoboDriving extends RoboDoing
   constructor: (name, goals, @driver, @direction) ->
     super name, goals
   entering: (oldState, currentState) =>
     @driver.drive @direction if currentState == @
 
 # drop a flag at the current location as a finding state and child of x
-class RobotFlaggingState extends RobotState
+class RoboFlagging extends RoboDoing
   constructor: (name, goals, @flagfactory) ->
     super name, goals
     
@@ -169,7 +194,7 @@ class RobotFlaggingState extends RobotState
     null
 
 # shoot a picture and move to parent state
-class RobotPhotographingState extends RobotState
+class RoboPhotographing extends RoboDoing
   constructor: (name, goals, @filename) ->
     super name, goals
     
@@ -194,11 +219,11 @@ class RobotPhotographingState extends RobotState
     , (e) -> console.log e
 
 # basic steering strategy
-class Steering extends Driving
+class RoboSteering extends RoboDriving
   constructor: (driver) ->
     super "steering", [], driver, 1
-    @left_turning = @addChild new Driving "left", [], driver, 5
-    @right_turning = @addChild new Driving "right", [], driver, 6
+    @left_turning = @addChild new RoboDriving "left", [], driver, 5
+    @right_turning = @addChild new RoboDriving "right", [], driver, 6
 
   listener: (currentState, event) ->
     # compare the direction with our goal direction
@@ -215,7 +240,7 @@ class Steering extends Driving
     return if currentState == newState then null else newState
 
 # go to the location specified and then move to parent state
-class RobotFindingState extends RobotState
+class RoboFinding extends RoboDoing
   constructor: (@basename, goals, strategy, @location, @perimeter=3, @compass_variance=20) ->
     super @basename, goals
     @addChild strategy if strategy
@@ -264,7 +289,7 @@ class RobotFindingState extends RobotState
 
 # end an activity when battery drops too low
 # todo: average out the readings
-class RobotBatteryLimit extends RobotState
+class RoboBatteryWatching extends RoboDoing
   constructor: (name, goals, @threshold) ->
     super name, goals
     
@@ -273,20 +298,20 @@ class RobotBatteryLimit extends RobotState
     return null
 
 # base button handler
-class ButtonWatcher extends RobotState
+class RoboButtonWatching extends RoboDoing
   listener: (currentState, event) ->
     return currentState.findHandler(event.button) if event.button
     return null
 
 # indicate the compass heading
-class CompassDisplay extends RobotState
+class RoboCompassDisplaying extends RoboDoing
   constructor: (name, goals) ->
     super name, goals
     @directions = [
-      @addChild new RobotState "north"
-      @addChild new RobotState "east"
-      @addChild new RobotState "south"
-      @addChild new RobotState "west"
+      @addChild new RoboDoing "north"
+      @addChild new RoboDoing "east"
+      @addChild new RoboDoing "south"
+      @addChild new RoboDoing "west"
       ]
 
   listener: (currentState, event) =>
@@ -298,12 +323,12 @@ class CompassDisplay extends RobotState
 
 # calibrate the compass (orientation events are not consistent between devices)
 # also intercept any state below this one by first calibrating
-class CompassCalibrator extends RobotSequentialState
+class RoboCompassCalibrating extends RoboSequencing
   constructor: (name, goals, @driver) ->
     super name, goals
-    @pathing = (@addChild new RobotTimeLimit "pathlimiting", [], 2).addChild new Driving "pathing", [], @driver, 1
-    @turning = (@addChild new RobotTimeLimit "turnlimiting", [], 8).addChild new Driving "rightturning", [], @driver, 6
-    @registering = @addChild new RobotState "registering"
+    @pathing = (@addChild new RoboTiming "pathlimiting", [], 2).addChild new RoboDriving "pathing", [], @driver, 1
+    @turning = (@addChild new RoboTiming "turnlimiting", [], 8).addChild new RoboDriving "rightturning", [], @driver, 6
+    @registering = @addChild new RoboDoing "registering"
     @reset()
 
   listener: (currentState, event) =>
@@ -347,8 +372,9 @@ class CompassCalibrator extends RobotSequentialState
     @location1 = null
     @location2 = null
 
-# keep track of state
-class StateTracker
+
+# keep track of running a robot
+class Bot
   constructor: (@notifier) ->
     @announcers = {}
 
@@ -369,6 +395,7 @@ class StateTracker
     @announcers[announcer.name] = announcer
 
 
+# base car driver
 class Car
   constructor: (@bot) ->
 
@@ -379,7 +406,6 @@ class Car
   announce: (msg) ->
     @bot.announce msg
 
-
 # LittleCar aka iRacer
 # LittleCar depends on a helper to bridge to bluetooth
 # adb shell
@@ -388,7 +414,6 @@ class Car
 #  request=`echo -e -n "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\n99" | nc -l -p 8080`
 #  echo -e -n "\x${request:5:2}"
 #done >/dev/rfcomm0
-
 class LittleCar extends Car
   constructor: (@bot) ->
     $.ajaxSetup xhr: -> new window.XMLHttpRequest mozSystem: true
@@ -399,7 +424,6 @@ class LittleCar extends Car
 
 # BigCar aka Brookstone's Wifi Racer
 # BigCar depends on the user to connect the phone to the car's wifi access point
-
 class BigCar extends Car
   constructor: (@bot, @pace=250, @address="192.168.2.3", @port=9000) ->
     @connecting = false
@@ -451,7 +475,7 @@ class BigCar extends Car
       @connectSocket()
       
 
-# Announcers deliver events to a bot
+# Announcer delivers events to a bot
 class Announcer
   constructor: (@name) ->
     console.log "Tracking #{@name} events"

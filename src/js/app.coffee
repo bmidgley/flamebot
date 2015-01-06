@@ -1,43 +1,48 @@
 # build my robot's state machine
 
-# extending buttonwatcher as the toplevel state so that buttons can override anything
-class RobotTestMachine extends ButtonWatcher
+# extending buttonwatching as the toplevel state so that buttons can override anything
+class RoboRacing extends RoboButtonWatching
   constructor: (@driver) ->
     # ready state responds to "stop" goal and when entered it stops the car
     super "ready", ["stop"]
 
     # activities under limited should be allowed some number of seconds to complete, then aborted
-    @limited = @addChild new RobotTimeLimit "limiting", [], 600
+    @limited = @addChild new RoboTiming "limiting", [], 180
 
     # this state will collect the flags we put down and it's where we start when the user hits go
-    @sequence = @limited.addChild new RobotSequentialState "stepping", ["go"]
+    @sequence = new RoboSequencing "stepping", ["go"]
+
+    # make sure compass has been calibrated before running through the sequence
+    @calibrator = new RoboCompassCalibrating "auto compass calibrating", [], @driver
+    @limited.addChild new RoboInterrupting "require calibrated compass", [], @sequence, @calibrator,
+      (bot) -> !bot.announcers.compass
 
     # plot a known final destination for debugging
-    #@sequence.addChild new RobotFindingState "trailhead", [], new Steering(@driver), latitude: 40.460304, longitude: -111.797706
+    #@sequence.addChild new RoboFinding "trailhead", [], new RoboSteering(@driver), latitude: 40.460304, longitude: -111.797706
 
     # hitting the store button goes here and drops a flag under the sequence state
-    @limited.addChild new RobotFlaggingState "storing", ["store"],
-      (coords) => @sequence.addChild new RobotFindingState "p", [], new Steering(@driver), coords
+    @limited.addChild new RoboFlagging "storing", ["store"],
+      (coords) => @sequence.addChild new RoboFinding "p", [], new RoboSteering(@driver), coords
 
     # simply engage the motor, subject to the time limit above
-    @driving = @limited.addChild new Driving "driving", ["drive"], @driver, 5
+    @driving = @limited.addChild new RoboDriving "driving", ["drive"], @driver, 5
 
     # the reset button is special... it constructs a brand new state machine (with no flags)
     # and sends in the same driver for reuse
-    @resetting = @addChild new RobotState "resetting", ["reset"]
+    @resetting = @addChild new RoboDoing "resetting", ["reset"]
 
     # shoot a picture
-    @addChild new RobotPhotographingState "shooting", ["shoot"], "picture1"
+    @addChild new RoboPhotographing "shooting", ["shoot"], "picture1"
 
-    # calibrate compass
-    @addChild new CompassCalibrator "calibrating", ["calibrate"], @driver
+    # manually calibrate compass
+    @addChild new RoboCompassCalibrating "compass calibrating", ["calibrate"], @driver
 
     # display compass
-    @addChild new CompassDisplay "compass", ["compass"]
+    @addChild new RoboCompassDisplaying "compass", ["compass"]
 
   listener: (currentState, event) =>
     if currentState == @resetting
-      return new RobotTestMachine @driver
+      return new RoboRacing @driver
     else
       return super currentState, event
 
@@ -46,7 +51,7 @@ class RobotTestMachine extends ButtonWatcher
       @driver.drive 0
 
 timer_id = null
-bot = new StateTracker (state, event) ->
+bot = new Bot (state, event) ->
   # this code is run each time the state changes
   # useful for displaying the current state machine and for debugging
   # event caused the last state change
@@ -63,7 +68,7 @@ bot = new StateTracker (state, event) ->
 
 $ ->
   # build and wire up
-  bot.setState new RobotTestMachine(new BigCar(bot, 200))
+  bot.setState new RoboRacing(new BigCar(bot, 200))
   bot.addAnnouncer new ButtonAnnouncer "button", ["go", "stop", "store", "reset", "drive", "shoot", "calibrate", "compass"]
   bot.addAnnouncer new CrashAnnouncer "crash"
   bot.addAnnouncer new OrientationAnnouncer "orientation"
