@@ -2,10 +2,12 @@ A cellphone is perfect for driving a robot--it has lots of sensors, wireless ada
 
 Flamebot is a first whack at a coffeescript framework that can be used to build a dynamic
 state machine to drive a robot. It's written as a FirefoxOS application that can run in the
-simulator or you can use Firefox to load it onto a firefoxOS phone.
+simulator or you can use Firefox to load it onto a FirefoxOS phone.
 
-It should soon be ready for a refactor as we're still experimenting to see what patterns 
-work when writing for it.
+The sample app included here presents a user interface that lets you drop virtual flags,
+calibrate the compass, follow the virtual flag path, shoot a picture. You see the current
+state machine expanded to highlight the current state when it's running. You can also expand
+and collapse the hierarchy to see the other states.
 
 You need to run a coffeescript compiler if you're going to edit the code: coffee -bcw --output . src/
 
