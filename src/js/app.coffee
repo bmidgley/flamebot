@@ -74,4 +74,4 @@ $ ->
   bot.addAnnouncer new OrientationAnnouncer "orientation"
   bot.addAnnouncer new LocationAnnouncer "location"
   bot.addAnnouncer new TimeAnnouncer "time"
-
+  bot.addAnnouncer new CorrectionAnnouncer "correction"

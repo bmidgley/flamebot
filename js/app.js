@@ -67,5 +67,6 @@ $(function() {
   bot.addAnnouncer(new CrashAnnouncer("crash"));
   bot.addAnnouncer(new OrientationAnnouncer("orientation"));
   bot.addAnnouncer(new LocationAnnouncer("location"));
-  return bot.addAnnouncer(new TimeAnnouncer("time"));
+  bot.addAnnouncer(new TimeAnnouncer("time"));
+  return bot.addAnnouncer(new CorrectionAnnouncer("correction"));
 });

@@ -385,7 +385,8 @@ RoboPhotographing = (function(_super) {
 RoboSteering = (function(_super) {
   __extends(RoboSteering, _super);
 
-  function RoboSteering(driver) {
+  function RoboSteering(driver, compass_variance) {
+    this.compass_variance = compass_variance != null ? compass_variance : 20;
     RoboSteering.__super__.constructor.call(this, "steering", [], driver, 1);
     this.left_turning = this.addChild(new RoboDriving("left", [], driver, 5));
     this.right_turning = this.addChild(new RoboDriving("right", [], driver, 6));
@@ -412,11 +413,10 @@ RoboSteering = (function(_super) {
 RoboFinding = (function(_super) {
   __extends(RoboFinding, _super);
 
-  function RoboFinding(basename, goals, strategy, location, perimeter, compass_variance) {
+  function RoboFinding(basename, goals, strategy, location, perimeter) {
     this.basename = basename;
     this.location = location;
     this.perimeter = perimeter != null ? perimeter : 3;
-    this.compass_variance = compass_variance != null ? compass_variance : 20;
     RoboFinding.__super__.constructor.call(this, this.basename, goals);
     if (strategy) {
       this.addChild(strategy);
@@ -589,11 +589,12 @@ RoboCompassCalibrating = (function(_super) {
         return v - a[(i || 1) - 1];
       });
       normal_indicators = (deltas.filter(function(n) {
-        return n < 300;
-      })).length;
-      backward_indicators = (deltas.filter(function(n) {
         return n > 300;
       })).length;
+      backward_indicators = (deltas.filter(function(n) {
+        return n < 300;
+      })).length;
+      console.log("normal = " + normal_indicators + " backward = " + backward_indicators);
       factor = normal_indicators > backward_indicators ? 1 : -1;
       offset = 0;
       if (normal_indicators + backward_indicators > 1) {
@@ -836,11 +837,15 @@ Announcer = (function() {
   };
 
   Announcer.prototype.announceResponse = function(property, args) {
+    var message;
     if (args == null) {
       args = [];
     }
-    if (this.bot && this.bot.currentState) {
-      return this.announce(this.bot.currentState.responseTo(property, args));
+    if (this.bot && this.bot.state) {
+      message = this.bot.state.responseTo(property, args);
+      if (message) {
+        return this.announce(message);
+      }
     }
   };
 

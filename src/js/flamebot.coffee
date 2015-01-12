@@ -220,7 +220,7 @@ class RoboPhotographing extends RoboDoing
 
 # basic steering strategy
 class RoboSteering extends RoboDriving
-  constructor: (driver) ->
+  constructor: (driver, @compass_variance=20) ->
     super "steering", [], driver, 1
     @left_turning = @addChild new RoboDriving "left", [], driver, 5
     @right_turning = @addChild new RoboDriving "right", [], driver, 6
@@ -241,7 +241,7 @@ class RoboSteering extends RoboDriving
 
 # go to the location specified and then move to parent state
 class RoboFinding extends RoboDoing
-  constructor: (@basename, goals, strategy, @location, @perimeter=3, @compass_variance=20) ->
+  constructor: (@basename, goals, strategy, @location, @perimeter=3) ->
     super @basename, goals
     @addChild strategy if strategy
 
@@ -353,8 +353,9 @@ class RoboCompassCalibrating extends RoboSequencing
 
       # normal/forward readings should have big drops as we turned clockwise passing north
       deltas = @readings2.map (v, i, a) -> v - a[(i||1)-1]
-      normal_indicators = (deltas.filter (n) -> n < 300).length
-      backward_indicators = (deltas.filter (n) -> n > 300).length
+      normal_indicators = (deltas.filter (n) -> n > 300).length
+      backward_indicators = (deltas.filter (n) -> n < 300).length
+      console.log "normal = #{normal_indicators} backward = #{backward_indicators}"
       factor = if normal_indicators > backward_indicators then 1 else -1
 
       # then see if there is an offset
@@ -488,8 +489,9 @@ class Announcer
     @bot.announce message if @bot
 
   announceResponse: (property, args=[]) ->
-    if @bot && @bot.currentState
-      @announce @bot.currentState.responseTo property, args
+    if @bot && @bot.state
+      message = @bot.state.responseTo property, args
+      @announce message if message
 
 # wire up the list of buttons to send corresponding events
 class ButtonAnnouncer extends Announcer
