@@ -337,10 +337,10 @@ class RoboCompassCalibrating extends RoboSequencing
           @location1 ||= event.location
           @location2 = event.location
         else if event.orientation
-          @readings1.push(event.orientation)
+          @readings1.push(event.orientation.alpha)
       when @turning
         if event.orientation
-          @readings2.push(event.orientation)
+          @readings2.push(event.orientation.alpha)
       when @registering
         return @
     super currentState, event
@@ -362,7 +362,10 @@ class RoboCompassCalibrating extends RoboSequencing
       #reading = @average_heading @readings1
       offset = 0
 
-      bot.addAnnouncer new CompassAnnouncer "compass", offset, factor
+      # only create a calibrated compass if it registered at least one rotation
+      if normal_indicators + backward_indicators > 1
+        bot.addAnnouncer new CompassAnnouncer "compass", offset, factor
+
       @reset()
 
   reset: ->

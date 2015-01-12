@@ -566,12 +566,12 @@ RoboCompassCalibrating = (function(_super) {
           this.location1 || (this.location1 = event.location);
           this.location2 = event.location;
         } else if (event.orientation) {
-          this.readings1.push(event.orientation);
+          this.readings1.push(event.orientation.alpha);
         }
         break;
       case this.turning:
         if (event.orientation) {
-          this.readings2.push(event.orientation);
+          this.readings2.push(event.orientation.alpha);
         }
         break;
       case this.registering:
@@ -596,7 +596,9 @@ RoboCompassCalibrating = (function(_super) {
       })).length;
       factor = normal_indicators > backward_indicators ? 1 : -1;
       offset = 0;
-      bot.addAnnouncer(new CompassAnnouncer("compass", offset, factor));
+      if (normal_indicators + backward_indicators > 1) {
+        bot.addAnnouncer(new CompassAnnouncer("compass", offset, factor));
+      }
       return this.reset();
     }
   };
