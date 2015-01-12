@@ -596,9 +596,7 @@ RoboCompassCalibrating = (function(_super) {
       })).length;
       factor = normal_indicators > backward_indicators ? 1 : -1;
       offset = 0;
-      if (normal_indicators + backward_indicators > 1) {
-        bot.addAnnouncer(new CompassAnnouncer("compass", offset, factor));
-      }
+      bot.addAnnouncer(new CompassAnnouncer("compass", offset, factor));
       return this.reset();
     }
   };

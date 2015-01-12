@@ -362,9 +362,10 @@ class RoboCompassCalibrating extends RoboSequencing
       #reading = @average_heading @readings1
       offset = 0
 
-      # only create a calibrated compass if it registered at least one rotation
-      if normal_indicators + backward_indicators > 1
-        bot.addAnnouncer new CompassAnnouncer "compass", offset, factor
+      # todo: only create a calibrated compass if it registered at least one rotation
+      # hardware can be flaky so assume a backward compass if no useful measurements came in
+      #if normal_indicators + backward_indicators > 1
+      bot.addAnnouncer new CompassAnnouncer "compass", offset, factor
 
       @reset()
 
