@@ -353,9 +353,8 @@ class RoboCompassCalibrating extends RoboSequencing
 
       # normal/forward readings should have big drops as we turned clockwise passing north
       deltas = @readings2.map (v, i, a) -> v - a[(i||1)-1]
-      normal_indicators = (deltas.filter (n) -> n > 300).length
-      backward_indicators = (deltas.filter (n) -> n < 300).length
-      console.log "normal = #{normal_indicators} backward = #{backward_indicators}"
+      normal_indicators = (deltas.filter (n) -> n < -300).length
+      backward_indicators = (deltas.filter (n) -> n > 300).length
       factor = if normal_indicators > backward_indicators then 1 else -1
 
       # then see if there is an offset

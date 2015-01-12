@@ -589,12 +589,11 @@ RoboCompassCalibrating = (function(_super) {
         return v - a[(i || 1) - 1];
       });
       normal_indicators = (deltas.filter(function(n) {
-        return n > 300;
+        return n < -300;
       })).length;
       backward_indicators = (deltas.filter(function(n) {
-        return n < 300;
+        return n > 300;
       })).length;
-      console.log("normal = " + normal_indicators + " backward = " + backward_indicators);
       factor = normal_indicators > backward_indicators ? 1 : -1;
       offset = 0;
       if (normal_indicators + backward_indicators > 1) {
