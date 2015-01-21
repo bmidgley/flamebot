@@ -554,3 +554,17 @@ class CompassAnnouncer extends Announcer
       @announce compass: adjusted
     , true
 
+# announce broadcast messages
+class BroadcastAnnouncer extends Announcer
+  constructor: (name, @host = "192.168.7.2", @port = 7777) ->
+    super name
+    $.ajaxSetup xhr: -> new XMLHttpRequest mozSystem: true
+    @interval_id = window.setInterval (=> @poll()), 1000
+
+  poll: =>
+    headers = {}
+    headers.Cookie = @cookie if @cookie
+    $.ajax "http://#{@host}:#{@port}", type: 'GET', dataType: 'json', headers: headers, success: (data, status, xhr) =>
+      @cookie ||= xhr.getResponseHeader("Set-Cookie")
+      @announce broadcast: data
+
