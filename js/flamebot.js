@@ -1017,7 +1017,6 @@ BroadcastAnnouncer = (function(_super) {
   function BroadcastAnnouncer(name, host, port) {
     this.host = host != null ? host : "192.168.7.2";
     this.port = port != null ? port : 7777;
-    this.poll = __bind(this.poll, this);
     BroadcastAnnouncer.__super__.constructor.call(this, name);
     $.ajaxSetup({
       xhr: function() {
@@ -1026,6 +1025,7 @@ BroadcastAnnouncer = (function(_super) {
         });
       }
     });
+    this.headers = {};
     this.interval_id = window.setInterval(((function(_this) {
       return function() {
         return _this.poll();
@@ -1034,21 +1034,33 @@ BroadcastAnnouncer = (function(_super) {
   }
 
   BroadcastAnnouncer.prototype.poll = function() {
-    var headers;
-    headers = {};
-    if (this.cookie) {
-      headers.Cookie = this.cookie;
-    }
     return $.ajax("http://" + this.host + ":" + this.port, {
       type: 'GET',
       dataType: 'json',
-      headers: headers,
+      headers: this.headers,
       success: (function(_this) {
         return function(data, status, xhr) {
-          _this.cookie || (_this.cookie = xhr.getResponseHeader("Set-Cookie"));
+          var _base;
+          (_base = _this.headers).Cookie || (_base.Cookie = xhr.getResponseHeader("Set-Cookie"));
+          console.log(data);
           return _this.announce({
             broadcast: data
           });
+        };
+      })(this)
+    });
+  };
+
+  BroadcastAnnouncer.prototype.send = function(message) {
+    return $.ajax("http://" + this.host + ":" + this.port, {
+      type: 'POST',
+      dataType: 'json',
+      contentType: "application/json; charset=utf-8",
+      headers: this.headers,
+      data: JSON.stringify(message),
+      success: (function(_this) {
+        return function(data, status, xhr) {
+          return console.log(data);
         };
       })(this)
     });

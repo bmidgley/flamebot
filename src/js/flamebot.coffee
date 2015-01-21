@@ -559,12 +559,18 @@ class BroadcastAnnouncer extends Announcer
   constructor: (name, @host = "192.168.7.2", @port = 7777) ->
     super name
     $.ajaxSetup xhr: -> new XMLHttpRequest mozSystem: true
+    @headers = {}
     @interval_id = window.setInterval (=> @poll()), 1000
 
-  poll: =>
-    headers = {}
-    headers.Cookie = @cookie if @cookie
-    $.ajax "http://#{@host}:#{@port}", type: 'GET', dataType: 'json', headers: headers, success: (data, status, xhr) =>
-      @cookie ||= xhr.getResponseHeader("Set-Cookie")
+  poll: ->
+    $.ajax "http://#{@host}:#{@port}", type: 'GET', dataType: 'json', headers: @headers, success: (data, status, xhr) =>
+      @headers.Cookie ||= xhr.getResponseHeader("Set-Cookie")
+      console.log data
       @announce broadcast: data
+
+  # this announcer is "special" since it knows how to talk to the message queue
+  # todo: refactor
+  send: (message) ->
+    $.ajax "http://#{@host}:#{@port}", type: 'POST', dataType: 'json', contentType: "application/json; charset=utf-8", headers: @headers, data: JSON.stringify(message), success: (data, status, xhr) =>
+      console.log data
 
