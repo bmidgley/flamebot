@@ -84,14 +84,14 @@ RoboDoing = (function() {
   };
 
   RoboDoing.prototype.contains = function(target) {
-    var child, _i, _len, _ref;
+    var behavior, _i, _len, _ref;
     if (target === this) {
       return true;
     }
     _ref = this.behaviors;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-      child = _ref[_i];
-      if (child.contains(target)) {
+      behavior = _ref[_i];
+      if (behavior.contains(target)) {
         return true;
       }
     }
@@ -207,10 +207,23 @@ RoboSequencing = (function(_super) {
   };
 
   RoboSequencing.prototype.entering = function(oldState, currentState) {
+    var examineState, idx;
     if (currentState !== this) {
       return;
     }
-    return this.counter = this.contains(oldState) ? this.counter + 1 : 0;
+    return this.counter = (function() {
+      if (this.contains(oldState)) {
+        idx = -1;
+        examineState = oldState;
+        while (idx === -1) {
+          idx = this.behaviors.indexOf(examineState);
+          examineState = examineState.parent;
+        }
+        return idx + 1;
+      } else {
+        return 0;
+      }
+    }).call(this);
   };
 
   RoboSequencing.prototype.addChild = function(state) {
@@ -232,11 +245,13 @@ RoboTiming = (function(_super) {
     this.elapsed = 0;
   }
 
-  RoboTiming.prototype.listener = function(currentState, event) {
+  RoboTiming.prototype.listener = function(currentState, event, bot) {
     if (currentState === this) {
       if (this.contained) {
+        this.completed(bot);
         return this.parent;
       } else {
+        this.started(bot);
         return this.behaviors[0] || this.parent;
       }
     }
@@ -244,6 +259,7 @@ RoboTiming = (function(_super) {
       this.elapsed += event.timer;
       if (this.elapsed > this.duration) {
         this.elapsed = 0;
+        this.alarmed(bot);
         return this.parent;
       }
     }
@@ -256,6 +272,12 @@ RoboTiming = (function(_super) {
       return this.elapsed = 0;
     }
   };
+
+  RoboTiming.prototype.completed = function(bot) {};
+
+  RoboTiming.prototype.alarmed = function(bot) {};
+
+  RoboTiming.prototype.started = function(bot) {};
 
   return RoboTiming;
 
@@ -634,6 +656,12 @@ Bot = (function() {
     newState = this.state.processEvent(this.state, event, this);
     if (newState) {
       return this.setState(newState, this.state, event);
+    }
+  };
+
+  Bot.prototype.broadcast = function(message) {
+    if (this.announcers.broadcasts) {
+      return this.announcers.broadcasts.send(message);
     }
   };
 

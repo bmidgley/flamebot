@@ -47,7 +47,7 @@ app.post('/', function(req, res) {
   req.body.serial = messages.length;
   messages.push(req.body);
   return res.json({
-    response: 'ok'
+    sent: req.body
   });
 });
 

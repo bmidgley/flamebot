@@ -54,8 +54,8 @@ class RoboDoing
 
   contains: (target) ->
     return true if target == @
-    for child in @behaviors
-      return true if child.contains(target)
+    for behavior in @behaviors
+      return true if behavior.contains(target)
     return false
 
   toRadians: (r) ->
@@ -117,10 +117,18 @@ class RoboSequencing extends RoboDoing
     return @behaviors[@counter] || @parent
     
   entering: (oldState, currentState) =>
-    # sequence is initialized/incremented if reached from a descendant
+    # sequence is incremented to the descendant if reached from a descendant
     # and reset if we entered from elsewhere
     return unless currentState == @
-    @counter = if @contains(oldState) then @counter + 1 else 0
+    @counter = if @contains(oldState)
+      idx = -1
+      examineState = oldState
+      while idx == -1
+        idx = @behaviors.indexOf(examineState)
+        examineState = examineState.parent
+      idx + 1
+    else 
+      0
 
   addChild: (state) ->
     state.name += " #{@behaviors.length+1}"
@@ -132,16 +140,19 @@ class RoboTiming extends RoboDoing
     super name, goals
     @elapsed = 0
     
-  listener: (currentState, event) ->
+  listener: (currentState, event, bot) ->
     if currentState == @
       if @contained
+        @completed bot
         return @parent
       else
+        @started bot
         return @behaviors[0] || @parent
     if event.timer
       @elapsed += event.timer
       if @elapsed > @duration
         @elapsed = 0
+        @alarmed bot
         return @parent
     null
 
@@ -149,6 +160,12 @@ class RoboTiming extends RoboDoing
     # if the state was an ancestor before, need to reset the timer
     @contained = @contains oldState
     @elapsed = 0 unless @contained
+
+  completed: (bot) ->
+
+  alarmed: (bot) ->
+
+  started: (bot) ->
 
 # interrupt something but then return after the interrupt activity finishes
 # activity must be a child so we get notified when it's entered
@@ -390,6 +407,9 @@ class Bot
     return unless @state
     newState = @state.processEvent @state, event, @
     @setState(newState, @state, event) if newState
+    
+  broadcast: (message) ->
+    @announcers.broadcasts.send(message) if @announcers.broadcasts
 
   addAnnouncer: (announcer) ->
     previous = @announcers[announcer.name]

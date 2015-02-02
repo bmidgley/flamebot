@@ -29,7 +29,7 @@ app.post '/', (req, res) ->
   req.body.sender = id
   req.body.serial = messages.length
   messages.push req.body
-  res.json response: 'ok'
+  res.json sent: req.body
 
 app.listen 7777, ->
   console.log 'app started'

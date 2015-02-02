@@ -1,0 +1,6 @@
+{
+"name": "flamebotq"
+,"version": "1.0.0"
+,"dependencies": { "express": ">=4.11.0", "express-session": ">=1.10.1", "coffee": ">=1.0.0", "coffee-script": ">=1.8.0", "body-parser": ">=1.10.1" }
+,"private": true
+}
