@@ -1,5 +1,69 @@
 # build my robot's state machine
 
+# Enhance RoboFinding to keep searching until our success is broadcast
+RoboGameFinding = class extends RoboFinding
+  listener: (currentState, event, bot) ->
+    newState = super currentState, event, bot
+    if event.broadcast
+      game = event.broadcast.game
+      if game && game.reached
+        return @parent.behaviors[game.reached]
+    # broadcast when we think we reached the goal, but don't think we've finished yet
+    if newState == @parent    
+      bot.broadcast game: {location: @current_location}
+    return null
+
+# add hooks to announce game results when finishing
+RoboGameClock = class extends RoboTiming
+  completed: (bot) ->
+    bot.broadcast game: {running: false, won: true, elapsed: @elapsed}
+
+  alarmed: (bot) ->
+    bot.broadcast game: {running: false, won: false, elapsed: @elapsed}
+
+# respond to a bot reaching the goal in a game
+RoboGameFinding = class extends RoboFinding
+  listener: (currentState, event, bot) ->
+    broadcast = event.broadcast
+    if broadcast && broadcast.game
+      game = broadcast.game
+      if game.location
+        # advance if perimeter was broken
+        distance = @distance(game.location.coords, @location)
+        if distance < @perimeter
+          next = 1 + (@ in @parent.behaviors)
+          bot.broadcast game: {running: true, sender: broadcast.sender, next: next}
+          return @parent
+    return null
+
+# run a game using the current set of flags
+RoboGaming = class extends RoboSequencing
+  constructor: (name, goals, @copyFrom) ->
+    super(name, goals)
+
+  entering: (oldState, currentState, bot) ->
+    if currentState == @ && !@contains(oldState)
+      @behaviors = []
+      for flag in @copyFrom.behaviors
+        @addChild new RoboGameFinding flag.basename, [], null, flag.location
+      bot.broadcast game: {running: true, flags: item.location for item in @copyFrom.behaviors}
+
+# ready state for participating in the game
+RoboPlaying = class extends RoboDoing
+  constructor: (name, goals, @sequence) ->
+    super(name, goals)
+
+  listener: (currentState, event) ->
+    return null unless event.broadcast && event.broadcast.game && event.broadcast.game.flags
+
+    # someone (?) just started a game!!
+    # clear our flags, set them using the custom finder, and set it as the new current state
+    @sequence.behaviors = []
+    for location in event.broadcast.game.flags
+      @sequence.addChild new RoboGameFinding "game", [], new RoboSteering(@driver), location
+    return @sequence
+
+
 # extending buttonwatching as the toplevel state so that buttons can override anything
 class RoboRacing extends RoboButtonWatching
   constructor: (@driver) ->
@@ -45,70 +109,6 @@ class RoboRacing extends RoboButtonWatching
     @playing.addChild new RoboFlagging "homebasing", [],
       (coords) => @playing.behaviors[3] = new RoboFinding "home", [], new RoboSteering(@driver), coords
     @playing.addChild new RoboTiming "gamelimit", [], 180
-
-    # Enhance RoboFinding to keep searching until our success is broadcast
-    RoboGameFinding = class extends RoboFinding
-      listener: (currentState, event, bot) ->
-        newState = super currentState, event, bot
-        if event.broadcast
-          game = event.broadcast.game
-          if game && game.reached
-            return @parent.behaviors[game.reached]
-        # broadcast when we think we reached the goal, but don't think we've finished yet
-        if newState == @parent    
-          bot.broadcast game: {location: @current_location}
-        return null
-
-    # add hooks to announce game results when finishing
-    RoboGameClock = class extends RoboTiming
-      completed: (bot) ->
-        bot.broadcast game: {running: false, won: true, elapsed: @elapsed}
-
-      alarmed: (bot) ->
-        bot.broadcast game: {running: false, won: false, elapsed: @elapsed}
-
-    # respond to a bot reaching the goal in a game
-    RoboGameFinding = class extends RoboFinding
-      listener: (currentState, event, bot) ->
-        broadcast = event.broadcast
-        if broadcast && broadcast.game
-          game = broadcast.game
-          if game.location
-            # advance if perimeter was broken
-            distance = @distance(game.location.coords, @location)
-            if distance < @perimeter
-              next = 1 + (@ in @parent.behaviors)
-              bot.broadcast game: {running: true, sender: broadcast.sender, next: next}
-              return @parent
-        return null
-
-    # run a game using the current set of flags
-    RoboGaming = class extends RoboSequencing
-      constructor: (name, goals, @copyFrom) ->
-        super(name, goals)
-
-      entering: (oldState, currentState, bot) ->
-        if currentState == @ && !@contains(oldState)
-          @behaviors = []
-          for flag in @copyFrom.behaviors
-            @addChild new RoboGameFinding flag.basename, [], null, flag.location
-          bot.broadcast game: {running: true, flags: item.location for item in @copyFrom.behaviors}
-
-    # ready state for participating in the game
-    RoboPlaying = class extends RoboDoing
-      constructor: (name, goals, @sequence) ->
-        super(name, goals)
-
-      listener: (currentState, event) ->
-        return null unless event.broadcast && event.broadcast.game && event.broadcast.game.flags
-
-        # someone (?) just started a game!!
-        # clear our flags, set them using the custom finder, and set it as the new current state
-        @sequence.behaviors = []
-        for location in event.broadcast.game.flags
-          @sequence.addChild new RoboGameFinding "game", [], new RoboSteering(@driver), location
-        return @sequence
-
     @gaming = @addChild new RoboGameClock "gaming", ["game"], 180
     @gaming.addChild new RoboGaming "gamesequencing", [], @sequence
 

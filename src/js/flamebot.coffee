@@ -58,21 +58,6 @@ class RoboDoing
       return true if behavior.contains(target)
     return false
 
-  toRadians: (r) ->
-    r * Math.PI / 180.0
-
-  toDegrees: (d) ->
-    180.0 * d / Math.PI
-
-  bearing: (a, b) ->
-    lat1 = @toRadians(a.latitude)
-    lat2 = @toRadians(b.latitude)
-    lon1 = @toRadians(a.longitude)
-    lon2 = @toRadians(b.longitude)
-    y = Math.sin(lon2 - lon1) * Math.cos(lat2)
-    x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1)
-    @toDegrees Math.atan2(y, x)
-
   accordian: (target, event) ->
     collapsed = if (target != @ && @contains(target)) then "false" else "true"
     x = "<div data-role='collapsible' data-collapsed='#{collapsed}' data-theme='b'><h3>#{if target == @ then "*#{@name}#{event}" else @name}</h3>"
@@ -199,7 +184,8 @@ class RoboDriving extends RoboDoing
   entering: (oldState, currentState) =>
     @driver.drive @direction if currentState == @
 
-# drop a flag at the current location as a finding state and child of x
+# execute the flagfactory with the next location event
+# used for dropping a flag
 class RoboFlagging extends RoboDoing
   constructor: (name, goals, @flagfactory) ->
     super name, goals
@@ -284,6 +270,15 @@ class RoboFinding extends RoboDoing
 
   toDegrees: (d) ->
     180.0 * d / Math.PI
+
+  bearing: (a, b) ->
+    lat1 = @toRadians(a.latitude)
+    lat2 = @toRadians(b.latitude)
+    lon1 = @toRadians(a.longitude)
+    lon2 = @toRadians(b.longitude)
+    y = Math.sin(lon2 - lon1) * Math.cos(lat2)
+    x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(lon2-lon1)
+    @toDegrees Math.atan2(y, x)
 
   correction: ->
     # return event with signed degree measurement needed to course correct

@@ -98,25 +98,6 @@ RoboDoing = (function() {
     return false;
   };
 
-  RoboDoing.prototype.toRadians = function(r) {
-    return r * Math.PI / 180.0;
-  };
-
-  RoboDoing.prototype.toDegrees = function(d) {
-    return 180.0 * d / Math.PI;
-  };
-
-  RoboDoing.prototype.bearing = function(a, b) {
-    var lat1, lat2, lon1, lon2, x, y;
-    lat1 = this.toRadians(a.latitude);
-    lat2 = this.toRadians(b.latitude);
-    lon1 = this.toRadians(a.longitude);
-    lon2 = this.toRadians(b.longitude);
-    y = Math.sin(lon2 - lon1) * Math.cos(lat2);
-    x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
-    return this.toDegrees(Math.atan2(y, x));
-  };
-
   RoboDoing.prototype.accordian = function(target, event) {
     var child, collapsed, x, _i, _len, _ref;
     collapsed = target !== this && this.contains(target) ? "false" : "true";
@@ -470,6 +451,17 @@ RoboFinding = (function(_super) {
 
   RoboFinding.prototype.toDegrees = function(d) {
     return 180.0 * d / Math.PI;
+  };
+
+  RoboFinding.prototype.bearing = function(a, b) {
+    var lat1, lat2, lon1, lon2, x, y;
+    lat1 = this.toRadians(a.latitude);
+    lat2 = this.toRadians(b.latitude);
+    lon1 = this.toRadians(a.longitude);
+    lon2 = this.toRadians(b.longitude);
+    y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+    x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+    return this.toDegrees(Math.atan2(y, x));
   };
 
   RoboFinding.prototype.correction = function() {
